@@ -448,7 +448,6 @@ async function main() {
         data: {
           reservationId: res.id,
           propertyId: property.id,
-          folioId: res.folio.id,
           amount: Number(res.paidAmount),
           method: ['CREDIT_CARD', 'DEBIT_CARD', 'CREDIT_CARD', 'BANK_TRANSFER', 'CASH'][Math.floor(Math.random() * 5)] as any,
           status: 'CAPTURED',
