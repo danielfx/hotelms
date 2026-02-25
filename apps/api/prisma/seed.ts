@@ -331,8 +331,133 @@ async function main() {
         },
       },
     });
+
+    // Add additional charges for some reservations (F&B, Spa, etc.)
+    const folio = await prisma.folio.findFirst({ where: { reservationId: reservation.id } });
+    if (folio && i % 2 === 0) {
+      // F&B charges for every other reservation
+      await prisma.folioCharge.create({
+        data: {
+          folioId: folio.id,
+          type: ChargeType.FB,
+          description: 'Restaurant - Dinner',
+          quantity: 1,
+          unitPrice: 65 + (i * 7),
+          amount: 65 + (i * 7),
+          taxRate: property.taxRate,
+          taxAmount: (65 + (i * 7)) * (property.taxRate / 100),
+        },
+      });
+    }
+    if (folio && i % 3 === 0) {
+      // Minibar charges
+      await prisma.folioCharge.create({
+        data: {
+          folioId: folio.id,
+          type: ChargeType.MINIBAR,
+          description: 'Minibar consumption',
+          quantity: 1,
+          unitPrice: 35,
+          amount: 35,
+          taxRate: property.taxRate,
+          taxAmount: 35 * (property.taxRate / 100),
+        },
+      });
+    }
+    if (folio && i % 4 === 0) {
+      // Spa charges
+      await prisma.folioCharge.create({
+        data: {
+          folioId: folio.id,
+          type: ChargeType.SPA,
+          description: 'Spa Treatment - Deep Tissue Massage',
+          quantity: 1,
+          unitPrice: 120,
+          amount: 120,
+          taxRate: property.taxRate,
+          taxAmount: 120 * (property.taxRate / 100),
+        },
+      });
+    }
+    if (folio && i % 5 === 0) {
+      // Parking charges
+      await prisma.folioCharge.create({
+        data: {
+          folioId: folio.id,
+          type: ChargeType.PARKING,
+          description: 'Valet Parking',
+          quantity: nights,
+          unitPrice: 35,
+          amount: 35 * nights,
+          taxRate: property.taxRate,
+          taxAmount: (35 * nights) * (property.taxRate / 100),
+        },
+      });
+    }
+    if (folio && i % 6 === 0) {
+      // Laundry charges
+      await prisma.folioCharge.create({
+        data: {
+          folioId: folio.id,
+          type: ChargeType.LAUNDRY,
+          description: 'Laundry Service',
+          quantity: 1,
+          unitPrice: 45,
+          amount: 45,
+          taxRate: property.taxRate,
+          taxAmount: 45 * (property.taxRate / 100),
+        },
+      });
+    }
+    // Add TAX charges
+    if (folio) {
+      await prisma.folioCharge.create({
+        data: {
+          folioId: folio.id,
+          type: ChargeType.TAX,
+          description: 'Property Tax',
+          quantity: 1,
+          unitPrice: taxAmount,
+          amount: taxAmount,
+        },
+      });
+      await prisma.folioCharge.create({
+        data: {
+          folioId: folio.id,
+          type: ChargeType.CITY_TAX,
+          description: 'City Tourism Tax',
+          quantity: 1,
+          unitPrice: totalRoom * (property.cityTaxRate / 100),
+          amount: totalRoom * (property.cityTaxRate / 100),
+        },
+      });
+    }
   }
   console.log('✅ Reservations created');
+
+  // ─── PAYMENT RECORDS ────────────────────────────────────────────────────────
+  // Create payment records for confirmed and checked-in reservations
+  const paidReservations = await prisma.reservation.findMany({
+    where: { propertyId: property.id, status: { in: ['CONFIRMED', 'CHECKED_IN'] }, paidAmount: { gt: 0 } },
+    include: { folio: true },
+  });
+
+  for (const res of paidReservations) {
+    if (res.folio && Number(res.paidAmount) > 0) {
+      await prisma.payment.create({
+        data: {
+          reservationId: res.id,
+          propertyId: property.id,
+          folioId: res.folio.id,
+          amount: Number(res.paidAmount),
+          method: ['CREDIT_CARD', 'DEBIT_CARD', 'CREDIT_CARD', 'BANK_TRANSFER', 'CASH'][Math.floor(Math.random() * 5)] as any,
+          status: 'CAPTURED',
+          reference: `PAY-${res.id.slice(-6).toUpperCase()}`,
+        },
+      });
+    }
+  }
+  console.log('✅ Payment records created');
 
   // ─── HOUSEKEEPING TASKS ───────────────────────────────────────────────────
   const hkTypes = [HousekeepingTaskType.CHECKOUT_CLEANING, HousekeepingTaskType.STAYOVER, HousekeepingTaskType.INSPECTION, HousekeepingTaskType.DEEP_CLEAN];
@@ -500,26 +625,26 @@ async function main() {
 
   const expenseData = [
     // Rooms Department
-    { department: 'ROOMS', category: 'LABOR', description: 'Front desk & housekeeping staff salaries', amount: 18000, month: currentMonth },
-    { department: 'ROOMS', category: 'SUPPLIES', description: 'Guest amenities, linens, cleaning supplies', amount: 2500, month: currentMonth },
-    { department: 'ROOMS', category: 'CONTRACTED', description: 'Laundry service for linens', amount: 1200, month: currentMonth },
+    { department: 'ROOMS', category: 'LABOR', description: 'Front desk & housekeeping staff salaries', amount: 4200, month: currentMonth },
+    { department: 'ROOMS', category: 'SUPPLIES', description: 'Guest amenities, linens, cleaning supplies', amount: 650, month: currentMonth },
+    { department: 'ROOMS', category: 'CONTRACTED', description: 'Laundry service for linens', amount: 380, month: currentMonth },
     // F&B Department
-    { department: 'FB', category: 'LABOR', description: 'Kitchen & restaurant staff salaries', amount: 8000, month: currentMonth },
-    { department: 'FB', category: 'SUPPLIES', description: 'Food & beverage cost of goods', amount: 4500, month: currentMonth },
-    { department: 'FB', category: 'CONTRACTED', description: 'Equipment maintenance', amount: 800, month: currentMonth },
+    { department: 'FB', category: 'LABOR', description: 'Kitchen & restaurant staff salaries', amount: 2200, month: currentMonth },
+    { department: 'FB', category: 'SUPPLIES', description: 'Food & beverage cost of goods', amount: 1100, month: currentMonth },
+    { department: 'FB', category: 'CONTRACTED', description: 'Equipment maintenance', amount: 250, month: currentMonth },
     // Spa
-    { department: 'SPA', category: 'LABOR', description: 'Spa therapists & reception', amount: 3000, month: currentMonth },
-    { department: 'SPA', category: 'SUPPLIES', description: 'Spa products & oils', amount: 800, month: currentMonth },
+    { department: 'SPA', category: 'LABOR', description: 'Spa therapists & reception', amount: 800, month: currentMonth },
+    { department: 'SPA', category: 'SUPPLIES', description: 'Spa products & oils', amount: 200, month: currentMonth },
     // Undistributed - Admin
-    { department: 'ADMIN', category: 'LABOR', description: 'Management & accounting salaries', amount: 12000, month: currentMonth },
-    { department: 'ADMIN', category: 'SUPPLIES', description: 'Office supplies & software', amount: 1500, month: currentMonth },
+    { department: 'ADMIN', category: 'LABOR', description: 'Management & accounting salaries', amount: 3000, month: currentMonth },
+    { department: 'ADMIN', category: 'SUPPLIES', description: 'Office supplies & software', amount: 400, month: currentMonth },
     // Undistributed - Marketing
-    { department: 'MARKETING', category: 'CONTRACTED', description: 'Digital marketing & OTA commissions', amount: 3000, month: currentMonth },
+    { department: 'MARKETING', category: 'CONTRACTED', description: 'Digital marketing & OTA commissions', amount: 800, month: currentMonth },
     // Undistributed - Maintenance
-    { department: 'MAINTENANCE', category: 'LABOR', description: 'Maintenance staff salaries', amount: 4000, month: currentMonth },
-    { department: 'MAINTENANCE', category: 'SUPPLIES', description: 'Repair parts & tools', amount: 2000, month: currentMonth },
+    { department: 'MAINTENANCE', category: 'LABOR', description: 'Maintenance staff salaries', amount: 1000, month: currentMonth },
+    { department: 'MAINTENANCE', category: 'SUPPLIES', description: 'Repair parts & tools', amount: 500, month: currentMonth },
     // Undistributed - Energy
-    { department: 'ENERGY', category: 'OTHER', description: 'Electricity, gas, water utilities', amount: 5500, month: currentMonth },
+    { department: 'ENERGY', category: 'OTHER', description: 'Electricity, gas, water utilities', amount: 1400, month: currentMonth },
   ];
 
   for (const exp of expenseData) {

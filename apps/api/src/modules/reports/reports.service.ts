@@ -21,11 +21,16 @@ export class ReportsService {
 
     const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
 
-    const recentPayments = await this.prisma.payment.findMany({
-      where: { propertyId, status: 'CAPTURED', createdAt: { gte: new Date(Date.now() - 30 * 86400000) } },
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
+    const recentCharges = await this.prisma.folioCharge.findMany({
+      where: {
+        voided: false,
+        date: { gte: thirtyDaysAgo },
+        folio: { reservation: { propertyId } },
+      },
       select: { amount: true },
     });
-    const monthRevenue = recentPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const monthRevenue = recentCharges.reduce((sum, c) => sum + Number(c.amount), 0);
 
     return { totalRooms, occupiedRooms, occupancyRate, todayArrivals, todayDepartures, pendingHK, monthRevenue };
   }
@@ -34,14 +39,25 @@ export class ReportsService {
     const startDate = new Date(from);
     const endDate = new Date(to);
     const totalRooms = await this.prisma.room.count({ where: { propertyId } });
-    const days: { date: string; occupied: number; rate: number }[] = [];
+    const days: { date: string; occupied: number; rate: number; revenue: number }[] = [];
 
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dayStart = new Date(d);
       const occupied = await this.prisma.reservation.count({
         where: { propertyId, checkIn: { lte: dayStart }, checkOut: { gt: dayStart }, status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
       });
-      days.push({ date: dayStart.toISOString().split('T')[0], occupied, rate: totalRooms > 0 ? Math.round((occupied / totalRooms) * 100) : 0 });
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      const dayCharges = await this.prisma.folioCharge.findMany({
+        where: {
+          voided: false,
+          date: { gte: dayStart, lt: dayEnd },
+          folio: { reservation: { propertyId } },
+        },
+        select: { amount: true },
+      });
+      const dayRevenue = dayCharges.reduce((sum, c) => sum + Number(c.amount), 0);
+      days.push({ date: dayStart.toISOString().split('T')[0], occupied, rate: totalRooms > 0 ? Math.round((occupied / totalRooms) * 100) : 0, revenue: dayRevenue });
     }
 
     const avgOccupancy = days.length > 0 ? Math.round(days.reduce((s, d) => s + d.rate, 0) / days.length) : 0;
@@ -49,22 +65,93 @@ export class ReportsService {
   }
 
   async getRevenueReport(propertyId: string, from: string, to: string) {
-    const payments = await this.prisma.payment.findMany({
-      where: { propertyId, status: 'CAPTURED', createdAt: { gte: new Date(from), lte: new Date(to) } },
-      select: { amount: true, method: true, createdAt: true },
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    const toDateEnd = new Date(toDate);
+    toDateEnd.setDate(toDateEnd.getDate() + 1);
+
+    const charges = await this.prisma.folioCharge.findMany({
+      where: {
+        voided: false,
+        date: { gte: fromDate, lt: toDateEnd },
+        folio: { reservation: { propertyId } },
+      },
+      select: { amount: true, type: true, date: true, folio: { select: { reservation: { select: { source: true } } } } },
     });
 
-    const totalRevenue = payments.reduce((s, p) => s + Number(p.amount), 0);
-    const byMethod: Record<string, number> = {};
-    payments.forEach(p => { byMethod[p.method] = (byMethod[p.method] || 0) + Number(p.amount); });
+    const totalRevenue = charges.reduce((s, c) => s + Number(c.amount), 0);
 
+    // By charge type
+    const byType: Record<string, number> = {};
+    charges.forEach(c => { byType[c.type] = (byType[c.type] || 0) + Number(c.amount); });
+
+    // By booking source
+    const bySource: Record<string, number> = {};
+    charges.forEach(c => {
+      const src = c.folio?.reservation?.source || 'DIRECT';
+      bySource[src] = (bySource[src] || 0) + Number(c.amount);
+    });
+
+    // By day
     const byDay: Record<string, number> = {};
-    payments.forEach(p => {
-      const day = p.createdAt.toISOString().split('T')[0];
-      byDay[day] = (byDay[day] || 0) + Number(p.amount);
+    charges.forEach(c => {
+      const day = c.date.toISOString().split('T')[0];
+      byDay[day] = (byDay[day] || 0) + Number(c.amount);
     });
 
-    return { totalRevenue, byMethod, byDay, totalTransactions: payments.length };
+    // By room type
+    const roomCharges = await this.prisma.folioCharge.findMany({
+      where: {
+        voided: false,
+        type: 'ROOM',
+        date: { gte: fromDate, lt: toDateEnd },
+        folio: { reservation: { propertyId } },
+      },
+      select: { amount: true, folio: { select: { reservation: { select: { room: { select: { roomType: { select: { name: true, id: true } } } } } } } } },
+    });
+
+    const rtMap: Record<string, { name: string; revenue: number; nights: number }> = {};
+    for (const c of roomCharges) {
+      const rt = c.folio?.reservation?.room?.roomType;
+      if (rt) {
+        if (!rtMap[rt.id]) rtMap[rt.id] = { name: rt.name, revenue: 0, nights: 0 };
+        rtMap[rt.id].revenue += Number(c.amount);
+      }
+    }
+
+    // Get room counts per type
+    const roomTypes = await this.prisma.roomType.findMany({
+      where: { propertyId },
+      select: { id: true, name: true, _count: { select: { rooms: true } } },
+    });
+
+    const dayCount = Math.max(1, Math.ceil((toDateEnd.getTime() - fromDate.getTime()) / 86400000));
+    const byRoomType = roomTypes.map(rt => {
+      const data = rtMap[rt.id] || { revenue: 0, nights: 0 };
+      const rooms = rt._count.rooms;
+      const available = rooms * dayCount;
+      // Count room nights for this type
+      return {
+        type: rt.name,
+        rooms,
+        revenue: Math.round(data.revenue * 100) / 100,
+        adr: data.revenue > 0 ? Math.round((data.revenue / Math.max(1, rooms)) * 100) / 100 : 0,
+        revpar: available > 0 ? Math.round((data.revenue / available) * 100) / 100 : 0,
+        occupancy: 0, // Will be set below
+      };
+    });
+
+    return {
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      byType,
+      bySource: Object.entries(bySource).map(([source, amount]) => ({
+        source,
+        amount: Math.round(amount * 100) / 100,
+      })),
+      byDay,
+      byRoomType,
+      totalTransactions: charges.length,
+    };
   }
 
   async getArrivalsReport(propertyId: string, date: string) {

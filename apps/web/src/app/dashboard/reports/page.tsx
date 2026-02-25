@@ -46,6 +46,10 @@ function UsaliTab() {
   const [expAmount, setExpAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Filter state
+  const [filterDept, setFilterDept] = useState("ALL");
+  const [filterCat, setFilterCat] = useState("ALL");
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -317,37 +321,57 @@ function UsaliTab() {
           </button>
         </form>
 
+        {/* Filter Dropdowns */}
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-sm text-slate-500">Filter:</span>
+          <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white">
+            <option value="ALL">All Departments</option>
+            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white">
+            <option value="ALL">All Categories</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
         {/* Expenses Table */}
-        {expenses.length === 0 ? (
-          <div className="text-center py-8 text-slate-400 text-sm">No expenses recorded for this month.</div>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-xs text-slate-500 border-b border-slate-100 uppercase tracking-wide">
-                <th className="pb-2 font-medium">Department</th>
-                <th className="pb-2 font-medium">Category</th>
-                <th className="pb-2 font-medium">Description</th>
-                <th className="pb-2 font-medium text-right">Amount</th>
-                <th className="pb-2 font-medium w-10"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.map((exp: any) => (
-                <tr key={exp.id} className="border-b border-slate-50 hover:bg-slate-50">
-                  <td className="py-2 text-sm font-medium text-slate-700">{exp.department}</td>
-                  <td className="py-2 text-sm text-slate-600">{exp.category}</td>
-                  <td className="py-2 text-sm text-slate-600">{exp.description}</td>
-                  <td className="py-2 text-sm text-right font-medium text-slate-900">${fmt(Number(exp.amount))}</td>
-                  <td className="py-2 text-right">
-                    <button onClick={() => handleDeleteExpense(exp.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1">
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
+        {(() => {
+          const filteredExpenses = expenses.filter((exp: any) => {
+            if (filterDept !== "ALL" && exp.department !== filterDept) return false;
+            if (filterCat !== "ALL" && exp.category !== filterCat) return false;
+            return true;
+          });
+          return filteredExpenses.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-sm">No expenses recorded for this month.</div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 border-b border-slate-100 uppercase tracking-wide">
+                  <th className="pb-2 font-medium">Department</th>
+                  <th className="pb-2 font-medium">Category</th>
+                  <th className="pb-2 font-medium">Description</th>
+                  <th className="pb-2 font-medium text-right">Amount</th>
+                  <th className="pb-2 font-medium w-10"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {filteredExpenses.map((exp: any) => (
+                  <tr key={exp.id} className="border-b border-slate-50 hover:bg-slate-50">
+                    <td className="py-2 text-sm font-medium text-slate-700">{exp.department}</td>
+                    <td className="py-2 text-sm text-slate-600">{exp.category}</td>
+                    <td className="py-2 text-sm text-slate-600">{exp.description}</td>
+                    <td className="py-2 text-sm text-right font-medium text-slate-900">${fmt(Number(exp.amount))}</td>
+                    <td className="py-2 text-right">
+                      <button onClick={() => handleDeleteExpense(exp.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1">
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          );
+        })()}
       </div>
     </div>
   );
@@ -405,41 +429,30 @@ export default function ReportsPage() {
           });
         }
 
-        if (occupancy && Array.isArray(occupancy)) {
-          setOccupancyData(occupancy.map((d: any) => ({
-            date: d.date ? new Date(d.date).toLocaleDateString("en-US", { weekday: "short" }) : d.label ?? "",
-            occupancy: Number(d.occupancyRate ?? d.occupancy ?? 0),
-            revenue: Number(d.revenue ?? 0),
-          })));
-        } else if (occupancy && typeof occupancy === "object") {
-          const arr = occupancy.daily ?? occupancy.data ?? [];
+        if (occupancy) {
+          const arr = Array.isArray(occupancy) ? occupancy : (occupancy.days ?? occupancy.daily ?? occupancy.data ?? []);
           if (Array.isArray(arr)) {
             setOccupancyData(arr.map((d: any) => ({
               date: d.date ? new Date(d.date).toLocaleDateString("en-US", { weekday: "short" }) : d.label ?? "",
-              occupancy: Number(d.occupancyRate ?? d.occupancy ?? 0),
+              occupancy: Number(d.rate ?? d.occupancyRate ?? d.occupancy ?? 0),
               revenue: Number(d.revenue ?? 0),
             })));
           }
         }
 
-        if (revenue && Array.isArray(revenue)) {
-          const total = revenue.reduce((sum: number, r: any) => sum + Number(r.amount ?? r.revenue ?? 0), 0);
-          setRevenueBySource(revenue.map((r: any) => ({
-            source: r.source ?? r.channel ?? r.name ?? "Unknown",
-            amount: Number(r.amount ?? r.revenue ?? 0),
-            pct: total > 0 ? Math.round((Number(r.amount ?? r.revenue ?? 0) / total) * 1000) / 10 : 0,
-          })));
-        } else if (revenue && typeof revenue === "object") {
-          const bySource = revenue.bySource ?? revenue.byChannel ?? revenue.data ?? [];
-          if (Array.isArray(bySource)) {
-            const total = bySource.reduce((sum: number, r: any) => sum + Number(r.amount ?? r.revenue ?? 0), 0);
-            setRevenueBySource(bySource.map((r: any) => ({
+        if (revenue) {
+          // Revenue by source
+          const sourceData = Array.isArray(revenue) ? revenue : (revenue.bySource ?? revenue.byChannel ?? []);
+          if (Array.isArray(sourceData) && sourceData.length > 0) {
+            const total = sourceData.reduce((sum: number, r: any) => sum + Number(r.amount ?? r.revenue ?? 0), 0);
+            setRevenueBySource(sourceData.map((r: any) => ({
               source: r.source ?? r.channel ?? r.name ?? "Unknown",
               amount: Number(r.amount ?? r.revenue ?? 0),
               pct: total > 0 ? Math.round((Number(r.amount ?? r.revenue ?? 0) / total) * 1000) / 10 : 0,
             })));
           }
 
+          // Room type performance
           const roomTypes = revenue.byRoomType ?? revenue.roomTypes ?? [];
           if (Array.isArray(roomTypes) && roomTypes.length > 0) {
             setRoomTypePerf(roomTypes.map((rt: any) => ({
@@ -450,6 +463,16 @@ export default function ReportsPage() {
               revpar: Number(rt.revpar ?? 0),
             })));
           }
+        }
+
+        // Update stats with revenue from revenue endpoint if dashboard revenue is 0
+        if (revenue && (revenue.totalRevenue ?? 0) > 0) {
+          setStats(prev => ({
+            ...prev,
+            totalRevenue: Number(revenue.totalRevenue),
+            adr: prev.inHouse > 0 ? Number(revenue.totalRevenue) / prev.inHouse : 0,
+            revpar: prev.available + prev.inHouse > 0 ? Number(revenue.totalRevenue) / (prev.available + prev.inHouse) : 0,
+          }));
         }
       } catch (err) {
         console.error("Failed to load reports:", err);
