@@ -882,9 +882,15 @@ async function main() {
   }
   console.log('✅ Guest surveys created with responses');
 
+  // ─── BILLING: cleanup existing billing data for re-runnability ──────────────
+  await prisma.billingInvoice.deleteMany({ where: { subscription: { propertyId: property.id } } });
+  await prisma.subscription.deleteMany({ where: { propertyId: property.id } });
+
   // ─── BILLING: SUBSCRIPTION PLANS ────────────────────────────────────────────
-  const starterPlan = await prisma.subscriptionPlan.create({
-    data: {
+  const starterPlan = await prisma.subscriptionPlan.upsert({
+    where: { slug: 'starter' },
+    update: {},
+    create: {
       name: 'Starter',
       slug: 'starter',
       monthlyPrice: 49,
@@ -896,8 +902,10 @@ async function main() {
     },
   });
 
-  const professionalPlan = await prisma.subscriptionPlan.create({
-    data: {
+  const professionalPlan = await prisma.subscriptionPlan.upsert({
+    where: { slug: 'professional' },
+    update: {},
+    create: {
       name: 'Professional',
       slug: 'professional',
       monthlyPrice: 149,
@@ -909,13 +917,15 @@ async function main() {
     },
   });
 
-  const enterprisePlan = await prisma.subscriptionPlan.create({
-    data: {
+  const enterprisePlan = await prisma.subscriptionPlan.upsert({
+    where: { slug: 'enterprise' },
+    update: {},
+    create: {
       name: 'Enterprise',
       slug: 'enterprise',
       monthlyPrice: 399,
       yearlyPrice: 3830,
-      maxRooms: null, // unlimited
+      maxRooms: null,
       maxProperties: null,
       maxUsers: null,
       features: ['Unlimited rooms', 'Multi-property Portfolio', 'Advanced Analytics', 'API Access', 'Custom Integrations', 'Dedicated Account Manager', '24/7 Phone Support'],
