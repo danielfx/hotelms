@@ -1,0 +1,325 @@
+// Typed API client for HotelMS frontend
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+class ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = `${baseUrl}/api/v1`;
+  }
+
+  private getToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("accessToken");
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const token = this.getToken();
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    };
+
+    const res = await fetch(`${this.baseUrl}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
+
+    if (res.status === 401) {
+      // Try refresh
+      try {
+        const refreshRes = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+        });
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          localStorage.setItem("accessToken", data.data.accessToken);
+          // Retry original request
+          return this.request<T>(endpoint, options);
+        }
+      } catch {}
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+    }
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message?.message || data.message || "Request failed");
+    return data.data ?? data;
+  }
+
+  get<T>(endpoint: string) { return this.request<T>(endpoint); }
+  post<T>(endpoint: string, body?: unknown) { return this.request<T>(endpoint, { method: "POST", body: JSON.stringify(body) }); }
+  put<T>(endpoint: string, body?: unknown) { return this.request<T>(endpoint, { method: "PUT", body: JSON.stringify(body) }); }
+  patch<T>(endpoint: string, body?: unknown) { return this.request<T>(endpoint, { method: "PATCH", body: JSON.stringify(body) }); }
+  delete<T>(endpoint: string) { return this.request<T>(endpoint, { method: "DELETE" }); }
+
+  // ─── AUTH ──────────────────────────────────────────────────────────────────
+  auth = {
+    login: (email: string, password: string) => this.post<{ accessToken: string; user: any }>("/auth/login", { email, password }),
+    logout: () => this.post("/auth/logout"),
+    me: () => this.get<any>("/auth/me"),
+    refresh: () => this.post<{ accessToken: string }>("/auth/refresh"),
+    forgotPassword: (email: string) => this.post("/auth/forgot-password", { email }),
+    resetPassword: (token: string, newPassword: string) => this.post("/auth/reset-password", { token, newPassword }),
+    changePassword: (currentPassword: string, newPassword: string) => this.patch("/auth/change-password", { currentPassword, newPassword }),
+    switchProperty: (propertyId: string) => this.post<{ accessToken: string; property: any }>("/auth/switch-property", { propertyId }),
+  };
+
+  // ─── ROOMS ─────────────────────────────────────────────────────────────────
+  rooms = {
+    list: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any[]>(`/rooms${q}`);
+    },
+    get: (id: string) => this.get<any>(`/rooms/${id}`),
+    create: (data: any) => this.post<any>("/rooms", data),
+    update: (id: string, data: any) => this.patch<any>(`/rooms/${id}`, data),
+    updateStatus: (id: string, status: string, notes?: string) => this.patch<any>(`/rooms/${id}/status`, { status, notes }),
+    delete: (id: string) => this.delete(`/rooms/${id}`),
+    availability: (checkIn: string, checkOut: string) => this.get<any[]>(`/rooms/availability?checkIn=${checkIn}&checkOut=${checkOut}`),
+  };
+
+  // ─── RESERVATIONS ──────────────────────────────────────────────────────────
+  reservations = {
+    list: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any>(`/reservations${q}`);
+    },
+    get: (id: string) => this.get<any>(`/reservations/${id}`),
+    create: (data: any) => this.post<any>("/reservations", data),
+    update: (id: string, data: any) => this.patch<any>(`/reservations/${id}`, data),
+    checkIn: (id: string, data?: any) => this.post<any>(`/reservations/${id}/checkin`, data),
+    checkOut: (id: string) => this.post<any>(`/reservations/${id}/checkout`),
+    cancel: (id: string, reason?: string) => this.post<any>(`/reservations/${id}/cancel`, { reason }),
+    noShow: (id: string) => this.post<any>(`/reservations/${id}/no-show`),
+  };
+
+  // ─── GUESTS ────────────────────────────────────────────────────────────────
+  guests = {
+    list: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any>(`/guests${q}`);
+    },
+    get: (id: string) => this.get<any>(`/guests/${id}`),
+    create: (data: any) => this.post<any>("/guests", data),
+    update: (id: string, data: any) => this.patch<any>(`/guests/${id}`, data),
+    search: (q: string) => this.get<any[]>(`/guests/search?q=${encodeURIComponent(q)}`),
+  };
+
+  // ─── FOLIO ─────────────────────────────────────────────────────────────────
+  folio = {
+    get: (reservationId: string) => this.get<any>(`/folio/reservation/${reservationId}`),
+    getById: (folioId: string) => this.get<any>(`/folio/${folioId}`),
+    addCharge: (folioId: string, data: any) => this.post<any>(`/folio/${folioId}/charges`, data),
+    voidCharge: (chargeId: string) => this.patch<any>(`/folio/charges/${chargeId}/void`),
+    close: (folioId: string) => this.post<any>(`/folio/${folioId}/close`),
+    invoice: (folioId: string) => this.post<any>(`/folio/${folioId}/invoice`),
+    addPayment: (reservationId: string, data: any) => this.post<any>(`/folio/reservation/${reservationId}/payments`, data),
+  };
+
+  // ─── RATES ─────────────────────────────────────────────────────────────────
+  rates = {
+    list: () => this.get<any[]>("/rates/plans"),
+    get: (id: string) => this.get<any>(`/rates/plans/${id}`),
+    create: (data: any) => this.post<any>("/rates/plans", data),
+    update: (id: string, data: any) => this.patch<any>(`/rates/plans/${id}`, data),
+    bulkUpdate: (data: any) => this.post<any>("/rates/bulk-update", data),
+  };
+
+  // ─── HOUSEKEEPING ──────────────────────────────────────────────────────────
+  housekeeping = {
+    list: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any>(`/housekeeping/tasks${q}`);
+    },
+    update: (id: string, data: any) => this.patch<any>(`/housekeeping/tasks/${id}`, data),
+    assign: (id: string, attendantId: string) => this.post<any>(`/housekeeping/tasks/${id}/assign`, { attendantId }),
+    start: (id: string) => this.post<any>(`/housekeeping/tasks/${id}/start`),
+    complete: (id: string, data?: any) => this.post<any>(`/housekeeping/tasks/${id}/complete`, data),
+    inspect: (id: string, data?: any) => this.post<any>(`/housekeeping/tasks/${id}/inspect`, data),
+    generate: (date?: string) => this.post<any>("/housekeeping/schedule/generate", { date }),
+    attendants: () => this.get<any[]>("/housekeeping/attendants"),
+    stats: () => this.get<any>("/housekeeping/stats"),
+  };
+
+  // ─── REPORTS ───────────────────────────────────────────────────────────────
+  reports = {
+    occupancy: (params: { from: string; to: string }) => this.get<any>(`/reports/occupancy?from=${params.from}&to=${params.to}`),
+    revenue: (params: { from: string; to: string }) => this.get<any>(`/reports/revenue?from=${params.from}&to=${params.to}`),
+    arrivals: (date: string) => this.get<any>(`/reports/arrivals?date=${date}`),
+    departures: (date: string) => this.get<any>(`/reports/departures?date=${date}`),
+    nightAudit: (date: string) => this.post<any>("/reports/night-audit", { date }),
+    dashboard: () => this.get<any>("/reports/dashboard"),
+    usali: (from: string, to: string) => this.get<any>(`/reports/usali?from=${from}&to=${to}`),
+    usaliExpenses: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any[]>(`/reports/usali/expenses${q}`);
+    },
+    addExpense: (data: any) => this.post<any>("/reports/usali/expenses", data),
+    deleteExpense: (id: string) => this.delete(`/reports/usali/expenses/${id}`),
+  };
+
+  // ─── CHANNELS ──────────────────────────────────────────────────────────────
+  channels = {
+    list: () => this.get<any[]>("/channels"),
+    get: (id: string) => this.get<any>(`/channels/${id}`),
+    connect: (channel: string, credentials: any) => this.post<any>("/channels/connect", { channel, ...credentials }),
+    sync: (id: string, type?: string) => {
+      if (type === "rates") return this.post<any>(`/channels/${id}/sync/rates`, {});
+      if (type === "inventory") return this.post<any>(`/channels/${id}/sync/inventory`, {});
+      // Default: sync both by calling sync-all or rates
+      return this.post<any>(`/channels/${id}/sync/rates`, {});
+    },
+    syncAll: () => this.post<any>("/channels/sync-all"),
+    pullReservations: (id: string) => this.post<any>(`/channels/${id}/pull/reservations`),
+    disconnect: (id: string) => this.delete(`/channels/${id}`),
+    logs: (id: string) => this.get<any[]>(`/channels/${id}/logs`),
+  };
+
+  // ─── PROPERTIES ───────────────────────────────────────────────────────────
+  properties = {
+    list: () => this.get<any[]>("/properties"),
+    getCurrent: () => this.get<any>("/properties/current"),
+    update: (data: any) => this.patch<any>("/properties/current", data),
+    updateSettings: (data: any) => this.patch<any>("/properties/current/settings", data),
+    getStats: () => this.get<any>("/properties/current/stats"),
+  };
+
+  // ─── CRM ──────────────────────────────────────────────────────────────────
+  crm = {
+    listSegments: () => this.get<any[]>("/crm/segments"),
+    createSegment: (data: any) => this.post<any>("/crm/segments", data),
+    updateSegment: (id: string, data: any) => this.patch<any>(`/crm/segments/${id}`, data),
+    deleteSegment: (id: string) => this.delete(`/crm/segments/${id}`),
+    listCampaigns: () => this.get<any[]>("/crm/campaigns"),
+    getCampaign: (id: string) => this.get<any>(`/crm/campaigns/${id}`),
+    createCampaign: (data: any) => this.post<any>("/crm/campaigns", data),
+    updateCampaign: (id: string, data: any) => this.patch<any>(`/crm/campaigns/${id}`, data),
+    sendCampaign: (id: string) => this.post<any>(`/crm/campaigns/${id}/send`),
+    campaignAnalytics: (id: string) => this.get<any>(`/crm/campaigns/${id}/analytics`),
+  };
+
+  // ─── REVENUE INTELLIGENCE ─────────────────────────────────────────────────
+  revenue = {
+    listRules: () => this.get<any[]>("/revenue/rules"),
+    createRule: (data: any) => this.post<any>("/revenue/rules", data),
+    updateRule: (id: string, data: any) => this.patch<any>(`/revenue/rules/${id}`, data),
+    deleteRule: (id: string) => this.delete(`/revenue/rules/${id}`),
+    forecast: (from: string, to: string) => this.get<any[]>(`/revenue/forecast?from=${from}&to=${to}`),
+    recommendations: (from: string, to: string) => this.get<any[]>(`/revenue/recommendations?from=${from}&to=${to}`),
+    applyRecommendation: (id: string) => this.post<any>(`/revenue/recommendations/${id}/apply`),
+    competitors: () => this.get<any>("/revenue/competitors"),
+  };
+
+  // ─── REPUTATION ───────────────────────────────────────────────────────────
+  reputation = {
+    listReviews: (source?: string) => this.get<any[]>(`/reputation/reviews${source ? `?source=${source}` : ''}`),
+    reviewStats: () => this.get<any>("/reputation/reviews/stats"),
+    createReview: (data: any) => this.post<any>("/reputation/reviews", data),
+    respondToReview: (id: string, data: any) => this.post<any>(`/reputation/reviews/${id}/respond`, data),
+    listSurveys: () => this.get<any[]>("/reputation/surveys"),
+    createSurvey: (data: any) => this.post<any>("/reputation/surveys", data),
+    getSurvey: (id: string) => this.get<any>(`/reputation/surveys/${id}`),
+    surveyAnalytics: (id: string) => this.get<any>(`/reputation/surveys/${id}/analytics`),
+  };
+
+  // ─── PORTFOLIO ────────────────────────────────────────────────────────────
+  portfolio = {
+    dashboard: () => this.get<any>("/portfolio/dashboard"),
+    kpis: (from: string, to: string) => this.get<any>(`/portfolio/kpis?from=${from}&to=${to}`),
+    report: (from: string, to: string) => this.get<any>(`/portfolio/report?from=${from}&to=${to}`),
+  };
+
+  // ─── GROUPS & EVENTS ──────────────────────────────────────────────────────
+  groups = {
+    list: (status?: string) => this.get<any[]>(`/groups${status ? `?status=${status}` : ''}`),
+    get: (id: string) => this.get<any>(`/groups/${id}`),
+    create: (data: any) => this.post<any>("/groups", data),
+    update: (id: string, data: any) => this.patch<any>(`/groups/${id}`, data),
+    delete: (id: string) => this.delete(`/groups/${id}`),
+    addBlock: (groupId: string, data: any) => this.post<any>(`/groups/${groupId}/blocks`, data),
+    addRooming: (groupId: string, data: any) => this.post<any>(`/groups/${groupId}/rooming`, data),
+    listEventSpaces: () => this.get<any[]>("/groups/events/spaces"),
+    createEventSpace: (data: any) => this.post<any>("/groups/events/spaces", data),
+    listEventBookings: (from?: string, to?: string) => this.get<any[]>(`/groups/events/bookings${from ? `?from=${from}&to=${to}` : ''}`),
+    createEventBooking: (data: any) => this.post<any>("/groups/events/bookings", data),
+  };
+
+  // ─── MARKETPLACE ──────────────────────────────────────────────────────────
+  marketplace = {
+    listApiKeys: () => this.get<any[]>("/marketplace/api-keys"),
+    createApiKey: (data: any) => this.post<any>("/marketplace/api-keys", data),
+    revokeApiKey: (id: string) => this.post<any>(`/marketplace/api-keys/${id}/revoke`),
+    deleteApiKey: (id: string) => this.delete(`/marketplace/api-keys/${id}`),
+    listWebhooks: () => this.get<any[]>("/marketplace/webhooks"),
+    createWebhook: (data: any) => this.post<any>("/marketplace/webhooks", data),
+    updateWebhook: (id: string, data: any) => this.patch<any>(`/marketplace/webhooks/${id}`, data),
+    deleteWebhook: (id: string) => this.delete(`/marketplace/webhooks/${id}`),
+    webhookDeliveries: (id: string) => this.get<any[]>(`/marketplace/webhooks/${id}/deliveries`),
+    testWebhook: (id: string) => this.post<any>(`/marketplace/webhooks/${id}/test`),
+    listIntegrations: () => this.get<any[]>("/marketplace/integrations"),
+    installIntegration: (slug: string, config?: any) => this.post<any>(`/marketplace/integrations/${slug}/install`, { config }),
+    uninstallIntegration: (slug: string) => this.post<any>(`/marketplace/integrations/${slug}/uninstall`),
+  };
+
+  // ─── AUDIT ────────────────────────────────────────────────────────────────
+  audit = {
+    searchLogs: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any>(`/audit/logs${q}`);
+    },
+    logStats: () => this.get<any>("/audit/logs/stats"),
+    exportGuestData: (guestId: string) => this.get<any>(`/audit/gdpr/export/${guestId}`),
+    deleteGuestData: (guestId: string) => this.post<any>(`/audit/gdpr/delete/${guestId}`),
+    permissions: () => this.get<any>("/audit/permissions"),
+  };
+
+  // ─── ONBOARDING & HELP ────────────────────────────────────────────────────
+  onboarding = {
+    getProgress: () => this.get<any>("/onboarding/progress"),
+    completeStep: (step: string, data?: any) => this.post<any>(`/onboarding/progress/${step}`, { data }),
+    resetProgress: () => this.post<any>("/onboarding/progress/reset"),
+    helpCategories: () => this.get<any[]>("/onboarding/help/categories"),
+    helpArticles: (category?: string) => this.get<any[]>(`/onboarding/help/articles${category ? `?category=${category}` : ''}`),
+    helpArticle: (slug: string) => this.get<any>(`/onboarding/help/articles/${slug}`),
+  };
+
+  // ─── ROOM SERVICE ───────────────────────────────────────────────────────
+  roomService = {
+    listMenu: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any[]>(`/room-service/menu${q}`);
+    },
+    createMenuItem: (data: any) => this.post<any>("/room-service/menu", data),
+    updateMenuItem: (id: string, data: any) => this.patch<any>(`/room-service/menu/${id}`, data),
+    toggleAvailability: (id: string) => this.patch<any>(`/room-service/menu/${id}/availability`),
+    deleteMenuItem: (id: string) => this.delete(`/room-service/menu/${id}`),
+    listOrders: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any[]>(`/room-service/orders${q}`);
+    },
+    getOrder: (id: string) => this.get<any>(`/room-service/orders/${id}`),
+    createOrder: (data: any) => this.post<any>("/room-service/orders", data),
+    updateOrderStatus: (id: string, status: string) => this.patch<any>(`/room-service/orders/${id}/status`, { status }),
+    stats: () => this.get<any>("/room-service/stats"),
+  };
+
+  // ─── BILLING ──────────────────────────────────────────────────────────────
+  billing = {
+    plans: () => this.get<any[]>("/billing/plans"),
+    getSubscription: () => this.get<any>("/billing/subscription"),
+    createSubscription: (data: any) => this.post<any>("/billing/subscription", data),
+    updateSubscription: (data: any) => this.patch<any>("/billing/subscription", data),
+    cancelSubscription: () => this.post<any>("/billing/subscription/cancel"),
+    invoices: () => this.get<any[]>("/billing/invoices"),
+    invoice: (id: string) => this.get<any>(`/billing/invoices/${id}`),
+    usage: () => this.get<any>("/billing/usage"),
+  };
+}
+
+export const api = new ApiClient(API_URL);
+export default api;

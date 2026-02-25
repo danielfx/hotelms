@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: hotelms_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hotelms
+      POSTGRES_PASSWORD: hotelms_secret
+      POSTGRES_DB: hotelms
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotelms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: hotelms_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass hotelms_redis_secret
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend (NestJS) ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: hotelms_api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: "postgresql://hotelms:hotelms_secret@postgres:5432/hotelms"
+      REDIS_URL: "redis://:hotelms_redis_secret@redis:6379"
+      JWT_SECRET: "change-this-in-production"
+      JWT_EXPIRES_IN: "15m"
+      PORT: 3001
+      NODE_ENV: production
+      CORS_ORIGIN: "http://localhost:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/.env:/app/.env
+
+  # ─── Frontend (Next.js) ──────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: hotelms_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:3001"
+    depends_on:
+      - api
+
+  # ─── Adminer (DB UI) ─────────────────────────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: hotelms_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  redis_data:
