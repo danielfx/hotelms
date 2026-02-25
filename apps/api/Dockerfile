@@ -29,4 +29,4 @@ COPY --from=builder /app/prisma ./prisma/
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "echo 'Waiting for database...' && sleep 5 && echo 'Running migrations...' && npx prisma migrate deploy 2>&1 && echo 'Migrations done. Starting server...' && exec node dist/main.js"]
