@@ -20,15 +20,16 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 WORKDIR /app
 
 COPY --from=builder /app/package*.json ./
-RUN npm install --omit=dev
+RUN npm install --omit=dev && npm install prisma
 
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma/
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma/
 COPY --from=builder /app/dist ./dist/
 COPY --from=builder /app/prisma ./prisma/
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma/
-COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+
+COPY start.sh ./start.sh
+RUN chmod +x start.sh
 
 EXPOSE 3001
 
-CMD npx prisma migrate deploy && node dist/main.js
+CMD ["./start.sh"]
