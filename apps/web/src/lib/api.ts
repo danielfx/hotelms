@@ -24,8 +24,13 @@ class ApiClient {
           credentials: "include",
         });
         if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          localStorage.setItem("accessToken", data.data.accessToken);
+          const text = await refreshRes.text();
+          try {
+            const data = text ? JSON.parse(text) : {};
+            if (data.data?.accessToken) {
+              localStorage.setItem("accessToken", data.data.accessToken);
+            }
+          } catch {}
           return true;
         }
       } catch {}
@@ -62,7 +67,13 @@ class ApiClient {
       window.location.href = "/login";
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    let data: any;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(`Server returned non-JSON response (${res.status})`);
+    }
     if (!res.ok) throw new Error(data.message?.message || data.message || "Request failed");
     return data.data ?? data;
   }
