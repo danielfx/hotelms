@@ -2,9 +2,12 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import * as cookieParser from 'cookie-parser';
-import * as compression from 'compression';
-import helmet from 'helmet';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const cookieParser = require('cookie-parser');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const compression = require('compression');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const helmet = require('helmet');
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -15,7 +18,7 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = config.get<number>('PORT', 3001);
   const nodeEnv = config.get<string>('NODE_ENV', 'development');
-  const corsOrigins = config.get<string>('CORS_ORIGIN', 'http://localhost:3000').split(',');
+  const corsOrigins = config.get<string>('CORS_ORIGIN', 'http://localhost:3000,https://web-production-7af80.up.railway.app').split(',');
 
   // ─── Security ─────────────────────────────────────────────────────────────
   app.use(helmet({
