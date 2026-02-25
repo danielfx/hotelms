@@ -3,6 +3,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 class ApiClient {
   private baseUrl: string;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = `${baseUrl}/api/v1`;
@@ -11,6 +12,30 @@ class ApiClient {
   private getToken(): string | null {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("accessToken");
+  }
+
+  private async tryRefresh(): Promise<boolean> {
+    // Deduplicate concurrent refresh attempts — only one runs at a time
+    if (this.refreshPromise) return this.refreshPromise;
+    this.refreshPromise = (async () => {
+      try {
+        const refreshRes = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+        });
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          localStorage.setItem("accessToken", data.data.accessToken);
+          return true;
+        }
+      } catch {}
+      return false;
+    })();
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.refreshPromise = null;
+    }
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -28,19 +53,10 @@ class ApiClient {
     });
 
     if (res.status === 401) {
-      // Try refresh
-      try {
-        const refreshRes = await fetch(`${this.baseUrl}/auth/refresh`, {
-          method: "POST",
-          credentials: "include",
-        });
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          localStorage.setItem("accessToken", data.data.accessToken);
-          // Retry original request
-          return this.request<T>(endpoint, options);
-        }
-      } catch {}
+      const refreshed = await this.tryRefresh();
+      if (refreshed) {
+        return this.request<T>(endpoint, options);
+      }
       localStorage.removeItem("accessToken");
       localStorage.removeItem("user");
       window.location.href = "/login";

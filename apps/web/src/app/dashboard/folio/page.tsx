@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { DollarSign, Plus, X, CreditCard, Banknote, Receipt } from "lucide-react";
 import api from "@/lib/api";
@@ -92,6 +92,14 @@ function mapFolioData(raw: any): FolioData {
 }
 
 export default function FolioPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <FolioContent />
+    </Suspense>
+  );
+}
+
+function FolioContent() {
   const searchParams = useSearchParams();
   const [folio, setFolio] = useState<FolioData | null>(null);
   const [loading, setLoading] = useState(true);

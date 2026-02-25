@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Users, Search, Star, MapPin, Wifi, Car, Coffee, Dumbbell, Pool } from "lucide-react";
+import { Calendar, Users, Search, Star, MapPin, Wifi, Car, Coffee, Dumbbell, Waves } from "lucide-react";
 
 const PROPERTY = {
   name: "Grand Plaza Hotel & Spa",
@@ -20,7 +20,7 @@ const PROPERTY = {
 const AMENITY_ICONS: Record<string, any> = {
   "Free WiFi": <Wifi size={14} />,
   "Valet Parking": <Car size={14} />,
-  "Pool": <Pool size={14} />,
+  "Pool": <Waves size={14} />,
   "Fitness Center": <Dumbbell size={14} />,
   "Restaurant": <Coffee size={14} />,
 };
