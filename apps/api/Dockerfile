@@ -21,6 +21,9 @@ WORKDIR /app
 
 COPY --from=builder /app ./
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 3001
 
-CMD ["sh", "-c", "sleep 5 && npx prisma migrate deploy 2>&1 && npx prisma db seed 2>&1; exec node dist/main.js"]
+ENTRYPOINT ["/entrypoint.sh"]
