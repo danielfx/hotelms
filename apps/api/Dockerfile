@@ -19,14 +19,8 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 
 WORKDIR /app
 
-COPY --from=builder /app/package*.json ./
-RUN npm install --omit=dev && npm install prisma
-
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma/
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma/
-COPY --from=builder /app/dist ./dist/
-COPY --from=builder /app/prisma ./prisma/
+COPY --from=builder /app ./
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "echo 'Waiting for database...' && sleep 5 && echo 'Running migrations...' && npx prisma migrate deploy 2>&1 && echo 'Migrations done. Starting server...' && exec node dist/main.js"]
+CMD ["sh", "-c", "sleep 5 && npx prisma migrate deploy 2>&1 && npx prisma db seed 2>&1; exec node dist/main.js"]
