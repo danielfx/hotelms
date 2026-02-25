@@ -216,6 +216,22 @@ class ApiClient {
     getStats: () => this.get<any>("/properties/current/stats"),
   };
 
+  // ─── COMMUNICATIONS ───────────────────────────────────────────────────────
+  communications = {
+    inbox: () => this.get<any>("/communications/inbox"),
+    stats: () => this.get<any>("/communications/stats"),
+    templates: () => this.get<any[]>("/communications/templates"),
+    createTemplate: (data: any) => this.post<any>("/communications/templates", data),
+    send: (data: any) => this.post<any>("/communications/send", data),
+    bulk: (data: any) => this.post<any>("/communications/bulk", data),
+    reply: (reservationId: string, data: any) => this.post<any>(`/communications/reservations/${reservationId}/reply`, data),
+    sendConfirmation: (reservationId: string) => this.post<any>(`/communications/reservations/${reservationId}/booking-confirmation`),
+    sendPreArrival: (reservationId: string) => this.post<any>(`/communications/reservations/${reservationId}/pre-arrival`),
+    sendWelcome: (reservationId: string) => this.post<any>(`/communications/reservations/${reservationId}/welcome`),
+    sendReceipt: (reservationId: string) => this.post<any>(`/communications/reservations/${reservationId}/checkout-receipt`),
+    sendReviewRequest: (reservationId: string) => this.post<any>(`/communications/reservations/${reservationId}/review-request`),
+  };
+
   // ─── CRM ──────────────────────────────────────────────────────────────────
   crm = {
     listSegments: () => this.get<any[]>("/crm/segments"),

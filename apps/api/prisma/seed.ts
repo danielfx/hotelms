@@ -970,6 +970,332 @@ async function main() {
   }
   console.log('✅ Billing data created');
 
+  // ─── AUDIT LOGS ──────────────────────────────────────────────────────────
+  const auditActions = [
+    { action: 'LOGIN_SUCCESS', resource: 'auth', userId: users[1].id, ipAddress: '192.168.1.10', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+    { action: 'LOGIN_SUCCESS', resource: 'auth', userId: users[2].id, ipAddress: '192.168.1.22', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)' },
+    { action: 'LOGIN_FAILED', resource: 'auth', userId: null, ipAddress: '45.33.32.156', userAgent: 'Mozilla/5.0 (Linux; Android 13)', newValues: { email: 'hacker@evil.com' } },
+    { action: 'RESERVATION_CREATED', resource: 'reservation', userId: users[2].id, ipAddress: '192.168.1.22', newValues: { guest: 'María García', room: '301', nights: 3 } },
+    { action: 'RESERVATION_CREATED', resource: 'reservation', userId: users[2].id, ipAddress: '192.168.1.22', newValues: { guest: 'John Smith', room: '402', nights: 5 } },
+    { action: 'GUEST_CHECKOUT', resource: 'reservation', userId: users[2].id, ipAddress: '192.168.1.22', newValues: { guest: 'Sophie Müller', room: '205', balance: 0 } },
+    { action: 'RATE_UPDATED', resource: 'rate_plan', userId: users[3].id, ipAddress: '192.168.1.35', oldValues: { basePrice: 250 }, newValues: { basePrice: 299 } },
+    { action: 'RATE_UPDATED', resource: 'rate_plan', userId: users[3].id, ipAddress: '192.168.1.35', oldValues: { basePrice: 180 }, newValues: { basePrice: 210 } },
+    { action: 'ROOM_STATUS_CHANGE', resource: 'room', userId: users[4].id, ipAddress: '192.168.1.50', oldValues: { status: 'DIRTY' }, newValues: { status: 'CLEAN' } },
+    { action: 'ROOM_STATUS_CHANGE', resource: 'room', userId: users[4].id, ipAddress: '192.168.1.50', oldValues: { status: 'DIRTY' }, newValues: { status: 'INSPECTED' } },
+    { action: 'FOLIO_CHARGE', resource: 'folio', userId: users[2].id, ipAddress: '192.168.1.22', newValues: { type: 'MINIBAR', amount: 45, guest: 'Carlos Rodríguez' } },
+    { action: 'FOLIO_CHARGE', resource: 'folio', userId: users[2].id, ipAddress: '192.168.1.22', newValues: { type: 'SPA', amount: 189, guest: 'Emma Johnson' } },
+    { action: 'USER_CREATED', resource: 'user', userId: users[0].id, ipAddress: '10.0.0.1', newValues: { email: 'newstaff@grandplaza.com', role: 'FRONT_DESK' } },
+    { action: 'LOGIN_SUCCESS', resource: 'auth', userId: users[0].id, ipAddress: '10.0.0.1', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+    { action: 'LOGIN_SUCCESS', resource: 'auth', userId: users[3].id, ipAddress: '192.168.1.35', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)' },
+    { action: 'LOGIN_FAILED', resource: 'auth', userId: null, ipAddress: '203.0.113.42', userAgent: 'curl/7.88.1', newValues: { email: 'admin@hotelms.com' } },
+    { action: 'RESERVATION_CREATED', resource: 'reservation', userId: users[2].id, ipAddress: '192.168.1.22', newValues: { guest: 'Ahmed Hassan', room: '501', nights: 7 } },
+    { action: 'GUEST_CHECKOUT', resource: 'reservation', userId: users[2].id, ipAddress: '192.168.1.22', newValues: { guest: 'Yuki Tanaka', room: '304', balance: 0 } },
+  ];
+
+  for (let i = 0; i < auditActions.length; i++) {
+    const a = auditActions[i];
+    const hoursAgo = (auditActions.length - i) * 8 + Math.floor(seededRandom() * 4);
+    await prisma.auditLog.create({
+      data: {
+        propertyId: property.id,
+        userId: a.userId,
+        action: a.action,
+        resource: a.resource,
+        resourceId: null,
+        oldValues: (a as any).oldValues ?? undefined,
+        newValues: (a as any).newValues ?? undefined,
+        ipAddress: a.ipAddress,
+        userAgent: a.userAgent ?? null,
+        createdAt: new Date(Date.now() - hoursAgo * 3600000),
+      },
+    });
+  }
+  console.log('✅ Audit logs created:', auditActions.length);
+
+  // ─── GUEST MESSAGES (COMMUNICATIONS) ──────────────────────────────────────
+  // Get first few reservations that are CHECKED_IN or CONFIRMED for message threads
+  const messageReservations = await prisma.reservation.findMany({
+    where: { propertyId: property.id, status: { in: ['CHECKED_IN', 'CONFIRMED'] } },
+    include: { guest: true, room: true },
+    take: 5,
+  });
+
+  const messageThreads = [
+    {
+      messages: [
+        { direction: 'INBOUND', channel: 'EMAIL', subject: 'Pre-arrival request', body: 'Hello, we will be arriving around 8 PM. Is it possible to arrange a late check-in? Also, could you please have a bottle of champagne ready in the room? We are celebrating our anniversary!', hoursAgo: 72 },
+        { direction: 'OUTBOUND', channel: 'EMAIL', subject: 'Re: Pre-arrival request', body: 'Dear guest, congratulations on your anniversary! Late check-in is absolutely no problem - our front desk is open 24/7. We will have a complimentary bottle of champagne and a special turndown service prepared for your arrival. Welcome to Grand Plaza!', hoursAgo: 70 },
+        { direction: 'INBOUND', channel: 'EMAIL', subject: 'Re: Pre-arrival request', body: 'That sounds wonderful, thank you so much! Looking forward to our stay.', hoursAgo: 68 },
+      ],
+    },
+    {
+      messages: [
+        { direction: 'OUTBOUND', channel: 'WHATSAPP', body: 'Welcome to Grand Plaza Hotel Miami! Your room is ready. Here is your digital key and WiFi details: Network: GrandPlaza-Guest, Password: Beach2026!', hoursAgo: 48 },
+        { direction: 'INBOUND', channel: 'WHATSAPP', body: 'Thank you! The room is beautiful. Quick question - what time does the pool close?', hoursAgo: 46 },
+        { direction: 'OUTBOUND', channel: 'WHATSAPP', body: 'The pool is open from 7 AM to 10 PM daily. We also have a rooftop bar that opens at sunset. Enjoy your stay! 🌴', hoursAgo: 45 },
+      ],
+    },
+    {
+      messages: [
+        { direction: 'OUTBOUND', channel: 'SMS', body: 'Reminder: Your checkout is tomorrow at 11 AM. Need a late checkout? Reply YES and we will extend to 2 PM (subject to availability).', hoursAgo: 24 },
+        { direction: 'INBOUND', channel: 'SMS', body: 'YES please! Late checkout would be great.', hoursAgo: 23 },
+        { direction: 'OUTBOUND', channel: 'SMS', body: 'Done! Your checkout has been extended to 2 PM. Have a wonderful last evening in Miami!', hoursAgo: 22 },
+      ],
+    },
+    {
+      messages: [
+        { direction: 'INBOUND', channel: 'EMAIL', subject: 'Restaurant reservation', body: 'Hi, could you please reserve a table for 4 at the hotel restaurant for tonight at 8 PM? We would prefer a table with ocean view if available.', hoursAgo: 8 },
+        { direction: 'OUTBOUND', channel: 'EMAIL', subject: 'Re: Restaurant reservation', body: 'Of course! I have reserved an ocean-view table for 4 at 8 PM tonight at our Oceanfront Grill. The chef is featuring a special seafood tasting menu this evening. Bon appetit!', hoursAgo: 7 },
+      ],
+    },
+    {
+      messages: [
+        { direction: 'OUTBOUND', channel: 'EMAIL', subject: 'Thank you for staying at Grand Plaza!', body: 'Dear guest, thank you for choosing Grand Plaza Hotel Miami! We hope you enjoyed your stay. We would love to hear about your experience - please take a moment to leave us a review. See you again soon!', hoursAgo: 4 },
+        { direction: 'INBOUND', channel: 'EMAIL', subject: 'Re: Thank you for staying at Grand Plaza!', body: 'Everything was absolutely perfect! The staff was incredibly friendly and the ocean view from our suite was breathtaking. We will definitely be back next year!', hoursAgo: 2 },
+      ],
+    },
+  ];
+
+  let msgCount = 0;
+  for (let t = 0; t < Math.min(messageThreads.length, messageReservations.length); t++) {
+    const res = messageReservations[t];
+    const thread = messageThreads[t];
+    for (const msg of thread.messages) {
+      await prisma.guestMessage.create({
+        data: {
+          reservationId: res.id,
+          propertyId: property.id,
+          direction: msg.direction,
+          channel: msg.channel,
+          subject: (msg as any).subject ?? null,
+          body: msg.body,
+          isRead: msg.direction === 'OUTBOUND' || msg.hoursAgo > 24,
+          sentAt: new Date(Date.now() - msg.hoursAgo * 3600000),
+        },
+      });
+      msgCount++;
+    }
+  }
+  console.log('✅ Guest messages created:', msgCount);
+
+  // ─── GROUPS & EVENTS ──────────────────────────────────────────────────────
+  const groupCheckIn = new Date(today.getFullYear(), today.getMonth(), 10);
+  const groupCheckOut = new Date(today.getFullYear(), today.getMonth(), 14);
+
+  const group1 = await prisma.group.create({
+    data: {
+      propertyId: property.id,
+      name: 'TechCorp Annual Conference 2026',
+      contactName: 'Sarah Chen',
+      contactEmail: 'sarah.chen@techcorp.com',
+      contactPhone: '+1-415-555-0200',
+      companyName: 'TechCorp Industries',
+      status: 'DEFINITE',
+      checkIn: groupCheckIn,
+      checkOut: groupCheckOut,
+      totalRooms: 22,
+      confirmedRooms: 18,
+      cutoffDate: new Date(today.getFullYear(), today.getMonth(), 5),
+      baseRate: 245,
+      totalRevenue: 21560,
+      notes: 'Corporate rate negotiated. Includes meeting room and AV setup. VIP welcome bags for executives.',
+    },
+  });
+
+  const group2CheckIn = new Date(today.getFullYear(), today.getMonth() + 1, 7);
+  const group2CheckOut = new Date(today.getFullYear(), today.getMonth() + 1, 10);
+
+  const group2 = await prisma.group.create({
+    data: {
+      propertyId: property.id,
+      name: 'Martinez-Rodriguez Wedding',
+      contactName: 'Elena Martinez',
+      contactEmail: 'elena.mwedding@gmail.com',
+      contactPhone: '+1-305-555-0333',
+      companyName: null,
+      status: 'TENTATIVE',
+      checkIn: group2CheckIn,
+      checkOut: group2CheckOut,
+      totalRooms: 15,
+      confirmedRooms: 8,
+      cutoffDate: new Date(today.getFullYear(), today.getMonth() + 1, 1),
+      baseRate: 199,
+      totalRevenue: 0,
+      notes: 'Wedding reception on Saturday evening at Ocean View Terrace. Bride suite upgrade requested.',
+    },
+  });
+
+  const group3CheckIn = new Date(today.getFullYear(), today.getMonth(), 20);
+  const group3CheckOut = new Date(today.getFullYear(), today.getMonth(), 23);
+
+  const group3 = await prisma.group.create({
+    data: {
+      propertyId: property.id,
+      name: 'SunTravel Group Tour - Florida Highlights',
+      contactName: 'Paolo Bianchi',
+      contactEmail: 'groups@suntravel.it',
+      contactPhone: '+39-06-555-0100',
+      companyName: 'SunTravel Agency',
+      status: 'INQUIRY',
+      checkIn: group3CheckIn,
+      checkOut: group3CheckOut,
+      totalRooms: 10,
+      confirmedRooms: 0,
+      cutoffDate: new Date(today.getFullYear(), today.getMonth(), 15),
+      baseRate: 175,
+      totalRevenue: 0,
+      notes: 'Italian tour group. Need Italian-speaking staff if possible. Group meals at hotel restaurant.',
+    },
+  });
+
+  // Group blocks for TechCorp conference
+  const blockDates = [groupCheckIn, new Date(groupCheckIn.getTime() + 86400000), new Date(groupCheckIn.getTime() + 2 * 86400000), new Date(groupCheckIn.getTime() + 3 * 86400000)];
+  for (const d of blockDates) {
+    await prisma.groupBlock.create({ data: { groupId: group1.id, roomTypeCode: 'STD', date: d, blocked: 10, picked: 8, rate: 245 } });
+    await prisma.groupBlock.create({ data: { groupId: group1.id, roomTypeCode: 'DLX', date: d, blocked: 8, picked: 7, rate: 295 } });
+    await prisma.groupBlock.create({ data: { groupId: group1.id, roomTypeCode: 'STE', date: d, blocked: 4, picked: 3, rate: 395 } });
+  }
+
+  // Rooming list for TechCorp (confirmed attendees)
+  const roomingGuests = [
+    { guestName: 'Sarah Chen', guestEmail: 'sarah.chen@techcorp.com', roomTypeCode: 'STE', roomNumber: '501', status: 'CONFIRMED' },
+    { guestName: 'Michael Park', guestEmail: 'm.park@techcorp.com', roomTypeCode: 'DLX', roomNumber: '402', status: 'CONFIRMED' },
+    { guestName: 'Lisa Thompson', guestEmail: 'l.thompson@techcorp.com', roomTypeCode: 'DLX', roomNumber: '403', status: 'CONFIRMED' },
+    { guestName: 'James Wilson', guestEmail: 'j.wilson@techcorp.com', roomTypeCode: 'STD', roomNumber: '301', status: 'CONFIRMED' },
+    { guestName: 'Emily Davis', guestEmail: 'e.davis@techcorp.com', roomTypeCode: 'STD', roomNumber: '302', status: 'CONFIRMED' },
+    { guestName: 'Robert Taylor', guestEmail: 'r.taylor@techcorp.com', roomTypeCode: 'STD', roomNumber: null, status: 'PENDING' },
+    { guestName: 'Amanda White', guestEmail: 'a.white@techcorp.com', roomTypeCode: 'DLX', roomNumber: null, status: 'PENDING' },
+    { guestName: 'Daniel Brown', guestEmail: 'd.brown@techcorp.com', roomTypeCode: 'STD', roomNumber: null, status: 'PENDING' },
+  ];
+
+  for (const rg of roomingGuests) {
+    await prisma.roomingList.create({
+      data: { groupId: group1.id, guestName: rg.guestName, guestEmail: rg.guestEmail, roomTypeCode: rg.roomTypeCode, roomNumber: rg.roomNumber, checkIn: groupCheckIn, checkOut: groupCheckOut, status: rg.status },
+    });
+  }
+  console.log('✅ Groups created: 3 (with blocks and rooming list)');
+
+  // ─── EVENT SPACES ────────────────────────────────────────────────────────
+  const space1 = await prisma.eventSpace.create({
+    data: {
+      propertyId: property.id, name: 'Grand Ballroom', description: 'Elegant ballroom with crystal chandeliers, hardwood floors, and floor-to-ceiling windows overlooking the ocean. Ideal for galas, conferences, and large celebrations.',
+      capacity: 300, sqMeters: 450, hourlyRate: 200, halfDayRate: 750, fullDayRate: 1200,
+      amenities: ['Stage', 'Dance Floor', 'Built-in Sound System', 'Projector & Screen', 'WiFi', 'Dressing Room'],
+      images: [],
+    },
+  });
+
+  const space2 = await prisma.eventSpace.create({
+    data: {
+      propertyId: property.id, name: 'Ocean View Terrace', description: 'Open-air terrace with panoramic ocean views, perfect for weddings, cocktail receptions, and sunset events. Retractable awning for weather protection.',
+      capacity: 100, sqMeters: 200, hourlyRate: 150, halfDayRate: 550, fullDayRate: 900,
+      amenities: ['Ocean View', 'Retractable Awning', 'Bar Counter', 'String Lights', 'Portable Sound System', 'Heaters'],
+      images: [],
+    },
+  });
+
+  const space3 = await prisma.eventSpace.create({
+    data: {
+      propertyId: property.id, name: 'Executive Boardroom', description: 'State-of-the-art boardroom with smart TV, video conferencing, and ergonomic seating. Perfect for corporate meetings and executive retreats.',
+      capacity: 20, sqMeters: 60, hourlyRate: 100, halfDayRate: 350, fullDayRate: 600,
+      amenities: ['Smart TV 85"', 'Video Conferencing', 'Whiteboard', 'WiFi', 'Coffee Machine', 'Natural Light'],
+      images: [],
+    },
+  });
+
+  const space4 = await prisma.eventSpace.create({
+    data: {
+      propertyId: property.id, name: 'Garden Pavilion', description: 'Lush tropical garden setting with a covered pavilion, ideal for intimate ceremonies, brunch events, and outdoor workshops.',
+      capacity: 80, sqMeters: 150, hourlyRate: 125, halfDayRate: 450, fullDayRate: 750,
+      amenities: ['Tropical Garden', 'Covered Pavilion', 'Fairy Lights', 'Portable Bar', 'WiFi', 'Power Outlets'],
+      images: [],
+    },
+  });
+  console.log('✅ Event spaces created: 4');
+
+  // ─── EVENT BOOKINGS ──────────────────────────────────────────────────────
+  await prisma.eventBooking.create({
+    data: {
+      eventSpaceId: space1.id, groupId: group1.id, name: 'TechCorp Annual Keynote & Awards',
+      contactName: 'Sarah Chen', contactEmail: 'sarah.chen@techcorp.com',
+      eventDate: new Date(groupCheckIn.getTime() + 86400000),
+      startTime: '09:00', endTime: '17:00', attendees: 180,
+      setupType: 'THEATER', catering: true, avEquipment: ['Projector', 'Microphones', 'Laptop', 'Video Recording'],
+      totalAmount: 2850, status: 'CONFIRMED', notes: 'Full day conference. Morning keynote, afternoon breakout sessions. Lunch buffet for 180. AV team arrives at 7 AM.',
+    },
+  });
+
+  await prisma.eventBooking.create({
+    data: {
+      eventSpaceId: space2.id, groupId: group2.id, name: 'Martinez-Rodriguez Wedding Reception',
+      contactName: 'Elena Martinez', contactEmail: 'elena.mwedding@gmail.com',
+      eventDate: new Date(group2CheckIn.getTime() + 86400000),
+      startTime: '18:00', endTime: '23:30', attendees: 85,
+      setupType: 'BANQUET', catering: true, avEquipment: ['DJ Setup', 'Microphone', 'Spotlights'],
+      totalAmount: 4200, status: 'TENTATIVE', notes: 'Sunset ceremony at 18:00 followed by reception. Custom menu requested. Fireworks at midnight (city permit pending).',
+    },
+  });
+
+  await prisma.eventBooking.create({
+    data: {
+      eventSpaceId: space3.id, name: 'Miami Startup Founders Meetup',
+      contactName: 'David Rosen', contactEmail: 'david@miamistartups.co',
+      eventDate: new Date(today.getFullYear(), today.getMonth(), 18),
+      startTime: '14:00', endTime: '18:00', attendees: 18,
+      setupType: 'BOARDROOM', catering: true, avEquipment: ['Smart TV', 'Video Conferencing', 'Whiteboard'],
+      totalAmount: 650, status: 'CONFIRMED', notes: 'Monthly meetup. Coffee and snacks for 18. Need reliable WiFi for live demo.',
+    },
+  });
+  console.log('✅ Event bookings created: 3');
+
+  // ─── ONBOARDING PROGRESS ───────────────────────────────────────────────────
+  const onboardingSteps = [
+    { step: 'property_setup', completed: true, completedAt: new Date(Date.now() - 30 * 86400000), data: { name: property.name, address: property.address } },
+    { step: 'room_configuration', completed: true, completedAt: new Date(Date.now() - 28 * 86400000), data: { totalRooms: rooms.length, roomTypes: roomTypes.length } },
+    { step: 'rate_plans', completed: true, completedAt: new Date(Date.now() - 25 * 86400000), data: { plansCreated: 3 } },
+    { step: 'channel_connections', completed: true, completedAt: new Date(Date.now() - 20 * 86400000), data: { channels: ['Booking.com', 'Expedia', 'Airbnb'] } },
+    { step: 'team_setup', completed: false, completedAt: null, data: null },
+    { step: 'payment_gateway', completed: false, completedAt: null, data: null },
+  ];
+
+  for (const s of onboardingSteps) {
+    await prisma.onboardingProgress.create({
+      data: {
+        propertyId: property.id,
+        step: s.step,
+        completed: s.completed,
+        completedAt: s.completedAt,
+        data: s.data ?? undefined,
+      },
+    });
+  }
+  console.log('✅ Onboarding progress created: 6 steps');
+
+  // ─── HELP ARTICLES ────────────────────────────────────────────────────────
+  const helpArticles = [
+    { slug: 'getting-started-overview', title: 'Getting Started with HotelMS', body: 'Welcome to HotelMS! This guide will walk you through the initial setup of your property, including configuring rooms, setting up rate plans, and connecting your first distribution channel. Follow the setup wizard for step-by-step guidance.', category: 'Getting Started', sortOrder: 1 },
+    { slug: 'managing-reservations', title: 'Managing Reservations', body: 'Learn how to create, modify, and cancel reservations. Covers walk-in bookings, OTA reservations, group bookings, and the check-in/check-out workflow. Includes tips for handling overbookings and no-shows.', category: 'Reservations', sortOrder: 2 },
+    { slug: 'check-in-checkout-guide', title: 'Check-In & Check-Out Guide', body: 'Step-by-step guide for the front desk check-in and check-out process. Includes ID verification, key card assignment, folio review, and payment processing. Covers early check-in and late check-out procedures.', category: 'Reservations', sortOrder: 3 },
+    { slug: 'room-management', title: 'Room & Housekeeping Management', body: 'How to manage room inventory, status updates, and housekeeping assignments. Covers room blocking, out-of-order management, maintenance requests, and the housekeeping board.', category: 'Operations', sortOrder: 4 },
+    { slug: 'billing-folio-guide', title: 'Billing & Folio Management', body: 'Complete guide to guest folios, posting charges, processing payments, and generating invoices. Covers split folios, group billing, tax handling, and end-of-day procedures.', category: 'Billing', sortOrder: 5 },
+    { slug: 'rate-management', title: 'Rate Plans & Pricing', body: 'How to create and manage rate plans, set seasonal pricing, and configure dynamic rates. Includes BAR (Best Available Rate), corporate rates, promotional offers, and package deals.', category: 'Revenue', sortOrder: 6 },
+    { slug: 'channel-manager-setup', title: 'Channel Manager Setup', body: 'Connect your property to OTAs like Booking.com, Expedia, and Airbnb. Learn about inventory synchronization, rate parity, and managing reservations from multiple channels.', category: 'Distribution', sortOrder: 7 },
+    { slug: 'reports-analytics', title: 'Reports & Analytics', body: 'Overview of available reports including occupancy trends, revenue analysis, USALI departmental accounting, and guest demographics. Learn how to export data and schedule automated reports.', category: 'Reports', sortOrder: 8 },
+    { slug: 'guest-communications', title: 'Guest Communications', body: 'Set up automated guest messaging via Email, SMS, and WhatsApp. Configure booking confirmations, pre-arrival messages, check-in welcome messages, and post-stay review requests.', category: 'Communications', sortOrder: 9 },
+    { slug: 'groups-events', title: 'Groups & Event Management', body: 'How to manage group bookings, room blocks, rooming lists, and event spaces. Covers group rates, cutoff dates, billing, and coordination with the events team.', category: 'Groups', sortOrder: 10 },
+    { slug: 'security-audit', title: 'Security & Audit Logs', body: 'Understanding the audit trail, user activity monitoring, and GDPR compliance features. Learn how to export guest data, handle data deletion requests, and review security alerts.', category: 'Security', sortOrder: 11 },
+    { slug: 'user-roles-permissions', title: 'User Roles & Permissions', body: 'Guide to the role-based access control system. Covers available roles (Super Admin, General Manager, Front Desk, Revenue Manager, etc.) and their default permissions. Learn how to create users and assign roles.', category: 'Administration', sortOrder: 12 },
+  ];
+
+  for (const article of helpArticles) {
+    await prisma.helpArticle.upsert({
+      where: { slug: article.slug },
+      update: {},
+      create: { ...article, isPublished: true },
+    });
+  }
+  console.log('✅ Help articles created:', helpArticles.length);
+
   console.log('\n🎉 Seed complete!');
   console.log('\n📋 Login credentials:');
   console.log('  Super Admin:  admin@hotelms.com       / Admin1234!');
