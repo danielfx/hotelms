@@ -250,213 +250,177 @@ async function main() {
   );
   console.log('✅ Guests created:', guests.length);
 
-  // ─── RESERVATIONS ─────────────────────────────────────────────────────────
+  // ─── RESERVATIONS (Realistic February Peak Season) ────────────────────────
+  // Miami Beach luxury hotel in February: ~78% occupancy, peak season rates
   const today = new Date();
-  const sources = [BookingSource.DIRECT, BookingSource.BOOKING_COM, BookingSource.EXPEDIA, BookingSource.AIRBNB, BookingSource.PHONE];
-  const resStatuses = [ReservationStatus.CONFIRMED, ReservationStatus.CONFIRMED, ReservationStatus.CONFIRMED, ReservationStatus.PENDING, ReservationStatus.CHECKED_IN];
+  const feb1 = new Date(today.getFullYear(), today.getMonth(), 1);
+  const sources = [BookingSource.DIRECT, BookingSource.DIRECT, BookingSource.BOOKING_COM, BookingSource.BOOKING_COM, BookingSource.EXPEDIA, BookingSource.AIRBNB, BookingSource.PHONE];
+  const stayLengths = [2, 2, 3, 3, 3, 4, 4, 5, 5, 7]; // weighted 3-4 nights average
+  const seasonMultiplier = 1.5; // February peak season markup
+  const fbDescriptions = ['Restaurant - Dinner', 'Restaurant - Breakfast & Lunch', 'Poolside Bar Tab', 'In-Room Dining', 'Restaurant - Seafood Night'];
+  const spaDescriptions = ['Relaxation Massage 60min', 'Deep Tissue Massage 90min', 'Couples Spa Package', 'Facial Treatment', 'Hot Stone Therapy'];
+  const noteOptions = ['Late arrival after 22:00', 'Anniversary celebration', 'Honeymoon - champagne requested', 'Business traveler - early checkout', 'Repeat guest - VIP', 'Airport transfer arranged', null, null, null, null];
+  let reservationCount = 0;
 
-  const availableRooms = rooms.filter(r => r.status === RoomStatus.AVAILABLE || r.status === RoomStatus.OCCUPIED);
+  // Deterministic seed for reproducibility
+  let rngSeed = 42;
+  function seededRandom() {
+    rngSeed = (rngSeed * 16807) % 2147483647;
+    return (rngSeed - 1) / 2147483646;
+  }
 
-  for (let i = 0; i < Math.min(18, availableRooms.length); i++) {
-    const room = availableRooms[i];
+  for (const room of rooms) {
     const roomType = roomTypes.find(rt => rt.id === room.roomTypeId)!;
-    const checkIn = new Date(today);
-    checkIn.setDate(today.getDate() + (i % 14) - 4);
-    const nights = [1, 2, 3, 4, 5][i % 5];
-    const checkOut = new Date(checkIn);
-    checkOut.setDate(checkIn.getDate() + nights);
-    const guest = guests[i % guests.length];
-    const ratePlan = ratePlans[i % ratePlans.length];
-    const source = sources[i % sources.length];
-    const status = resStatuses[i % resStatuses.length];
-    const baseRate = Number(roomType.basePrice);
-    const totalRoom = baseRate * nights;
-    const taxAmount = totalRoom * (property.taxRate / 100);
-    const totalAmount = totalRoom + taxAmount + property.resortFee;
+    let cursor = new Date(feb1);
 
-    const reservation = await prisma.reservation.create({
-      data: {
-        propertyId: property.id,
-        roomId: room.id,
-        guestId: guest.id,
-        ratePlanId: ratePlan.id,
-        source,
-        status,
-        checkIn,
-        checkOut,
-        nights,
-        adults: Math.ceil(Math.random() * 2),
-        baseRate,
-        totalRoomCharge: totalRoom,
-        totalTax: taxAmount,
-        totalFees: property.resortFee,
-        totalAmount,
-        paidAmount: status === ReservationStatus.CHECKED_IN ? totalAmount : status === ReservationStatus.CONFIRMED ? totalAmount * 0.3 : 0,
-        balanceDue: status === ReservationStatus.CHECKED_IN ? 0 : totalAmount * 0.7,
-        commissionPct: source === BookingSource.BOOKING_COM ? 15 : source === BookingSource.EXPEDIA ? 18 : 0,
-        commission: source === BookingSource.BOOKING_COM ? totalAmount * 0.15 : source === BookingSource.EXPEDIA ? totalAmount * 0.18 : 0,
-        notes: i % 4 === 0 ? 'Late arrival after 22:00' : i % 7 === 0 ? 'Anniversary celebration - special decoration requested' : null,
-        checkedInAt: status === ReservationStatus.CHECKED_IN ? new Date() : null,
-      },
-    });
+    // Stagger arrivals: random offset 0-3 days
+    cursor.setDate(cursor.getDate() + Math.floor(seededRandom() * 4));
 
-    // Create folio for each reservation
-    await prisma.folio.create({
-      data: {
-        reservationId: reservation.id,
-        propertyId: property.id,
-        totalCharges: totalAmount,
-        totalPayments: Number(reservation.paidAmount),
-        totalTax: taxAmount,
-        balance: totalAmount - Number(reservation.paidAmount),
-        charges: {
-          create: [
-            {
-              type: ChargeType.ROOM,
-              description: `Room ${room.number} - ${roomType.name} (${nights} nights)`,
-              quantity: nights,
-              unitPrice: baseRate,
-              amount: totalRoom,
-              taxRate: property.taxRate,
-              taxAmount: taxAmount,
-            },
-            {
-              type: ChargeType.RESORT_FEE,
-              description: 'Resort Fee',
-              quantity: 1,
-              unitPrice: property.resortFee,
-              amount: property.resortFee,
-            },
-          ],
-        },
-      },
-    });
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0); // last day of Feb
+    while (cursor <= monthEnd) {
+      // ~8% chance to skip a slot (creates gaps → ~78% occupancy)
+      if (seededRandom() < 0.08) {
+        cursor.setDate(cursor.getDate() + 1 + Math.floor(seededRandom() * 2));
+        continue;
+      }
 
-    // Add additional charges for some reservations (F&B, Spa, etc.)
-    const folio = await prisma.folio.findFirst({ where: { reservationId: reservation.id } });
-    if (folio && i % 2 === 0) {
-      // F&B charges for every other reservation
-      await prisma.folioCharge.create({
-        data: {
-          folioId: folio.id,
-          type: ChargeType.FB,
-          description: 'Restaurant - Dinner',
-          quantity: 1,
-          unitPrice: 65 + (i * 7),
-          amount: 65 + (i * 7),
-          taxRate: property.taxRate,
-          taxAmount: (65 + (i * 7)) * (property.taxRate / 100),
-        },
-      });
-    }
-    if (folio && i % 3 === 0) {
-      // Minibar charges
-      await prisma.folioCharge.create({
-        data: {
-          folioId: folio.id,
-          type: ChargeType.MINIBAR,
-          description: 'Minibar consumption',
-          quantity: 1,
-          unitPrice: 35,
-          amount: 35,
-          taxRate: property.taxRate,
-          taxAmount: 35 * (property.taxRate / 100),
-        },
-      });
-    }
-    if (folio && i % 4 === 0) {
-      // Spa charges
-      await prisma.folioCharge.create({
-        data: {
-          folioId: folio.id,
-          type: ChargeType.SPA,
-          description: 'Spa Treatment - Deep Tissue Massage',
-          quantity: 1,
-          unitPrice: 120,
-          amount: 120,
-          taxRate: property.taxRate,
-          taxAmount: 120 * (property.taxRate / 100),
-        },
-      });
-    }
-    if (folio && i % 5 === 0) {
-      // Parking charges
-      await prisma.folioCharge.create({
-        data: {
-          folioId: folio.id,
-          type: ChargeType.PARKING,
-          description: 'Valet Parking',
-          quantity: nights,
-          unitPrice: 35,
-          amount: 35 * nights,
-          taxRate: property.taxRate,
-          taxAmount: (35 * nights) * (property.taxRate / 100),
-        },
-      });
-    }
-    if (folio && i % 6 === 0) {
-      // Laundry charges
-      await prisma.folioCharge.create({
-        data: {
-          folioId: folio.id,
-          type: ChargeType.LAUNDRY,
-          description: 'Laundry Service',
-          quantity: 1,
-          unitPrice: 45,
-          amount: 45,
-          taxRate: property.taxRate,
-          taxAmount: 45 * (property.taxRate / 100),
-        },
-      });
-    }
-    // Add TAX charges
-    if (folio) {
-      await prisma.folioCharge.create({
-        data: {
-          folioId: folio.id,
-          type: ChargeType.TAX,
-          description: 'Property Tax',
-          quantity: 1,
-          unitPrice: taxAmount,
-          amount: taxAmount,
-        },
-      });
-      await prisma.folioCharge.create({
-        data: {
-          folioId: folio.id,
-          type: ChargeType.CITY_TAX,
-          description: 'City Tourism Tax',
-          quantity: 1,
-          unitPrice: totalRoom * (property.cityTaxRate / 100),
-          amount: totalRoom * (property.cityTaxRate / 100),
-        },
-      });
-    }
-  }
-  console.log('✅ Reservations created');
+      const nights = stayLengths[Math.floor(seededRandom() * stayLengths.length)];
+      const checkIn = new Date(cursor);
+      const checkOut = new Date(checkIn);
+      checkOut.setDate(checkIn.getDate() + nights);
 
-  // ─── PAYMENT RECORDS ────────────────────────────────────────────────────────
-  // Create payment records for confirmed and checked-in reservations
-  const paidReservations = await prisma.reservation.findMany({
-    where: { propertyId: property.id, status: { in: ['CONFIRMED', 'CHECKED_IN'] }, paidAmount: { gt: 0 } },
-    include: { folio: true },
-  });
+      if (checkIn > monthEnd) break;
 
-  for (const res of paidReservations) {
-    if (res.folio && Number(res.paidAmount) > 0) {
-      await prisma.payment.create({
+      const baseRate = Math.round(Number(roomType.basePrice) * seasonMultiplier);
+      const totalRoom = baseRate * nights;
+      const taxAmount = Math.round(totalRoom * (property.taxRate / 100) * 100) / 100;
+      const totalAmount = totalRoom + taxAmount + property.resortFee;
+
+      const guest = guests[Math.floor(seededRandom() * guests.length)];
+      const ratePlan = ratePlans[Math.floor(seededRandom() * ratePlans.length)];
+      const source = sources[Math.floor(seededRandom() * sources.length)];
+
+      // Status based on dates relative to today
+      const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      let status: ReservationStatus;
+      if (checkOut <= todayMidnight) {
+        status = ReservationStatus.CHECKED_OUT;
+      } else if (checkIn <= todayMidnight) {
+        status = ReservationStatus.CHECKED_IN;
+      } else {
+        status = ReservationStatus.CONFIRMED;
+      }
+
+      const isPaid = status === ReservationStatus.CHECKED_OUT || status === ReservationStatus.CHECKED_IN;
+      const paidAmount = isPaid ? totalAmount : status === ReservationStatus.CONFIRMED ? totalAmount * 0.3 : 0;
+
+      const reservation = await prisma.reservation.create({
         data: {
-          reservationId: res.id,
           propertyId: property.id,
-          amount: Number(res.paidAmount),
-          method: ['CREDIT_CARD', 'DEBIT_CARD', 'CREDIT_CARD', 'BANK_TRANSFER', 'CASH'][Math.floor(Math.random() * 5)] as any,
-          status: 'CAPTURED',
-          reference: `PAY-${res.id.slice(-6).toUpperCase()}`,
+          roomId: room.id,
+          guestId: guest.id,
+          ratePlanId: ratePlan.id,
+          source,
+          status,
+          checkIn,
+          checkOut,
+          nights,
+          adults: 1 + Math.floor(seededRandom() * 2),
+          baseRate,
+          totalRoomCharge: totalRoom,
+          totalTax: taxAmount,
+          totalFees: property.resortFee,
+          totalAmount,
+          paidAmount,
+          balanceDue: totalAmount - paidAmount,
+          commissionPct: source === BookingSource.BOOKING_COM ? 15 : source === BookingSource.EXPEDIA ? 18 : 0,
+          commission: source === BookingSource.BOOKING_COM ? totalAmount * 0.15 : source === BookingSource.EXPEDIA ? totalAmount * 0.18 : 0,
+          notes: noteOptions[Math.floor(seededRandom() * noteOptions.length)],
+          checkedInAt: (status === ReservationStatus.CHECKED_IN || status === ReservationStatus.CHECKED_OUT) ? checkIn : null,
         },
       });
+
+      // Create folio with core charges
+      const folio = await prisma.folio.create({
+        data: {
+          reservationId: reservation.id,
+          propertyId: property.id,
+          totalCharges: totalAmount,
+          totalPayments: paidAmount,
+          totalTax: taxAmount,
+          balance: totalAmount - paidAmount,
+          status: status === ReservationStatus.CHECKED_OUT ? FolioStatus.CLOSED : FolioStatus.OPEN,
+          charges: {
+            create: [
+              { type: ChargeType.ROOM, description: `Room ${room.number} - ${roomType.name} (${nights} nights)`, quantity: nights, unitPrice: baseRate, amount: totalRoom, taxRate: property.taxRate, taxAmount },
+              { type: ChargeType.RESORT_FEE, description: 'Daily Resort Fee', quantity: nights, unitPrice: property.resortFee / nights, amount: property.resortFee },
+              { type: ChargeType.TAX, description: 'State Tax 7%', quantity: 1, unitPrice: taxAmount, amount: taxAmount },
+              { type: ChargeType.CITY_TAX, description: 'Miami Beach Tourism Tax 2%', quantity: 1, unitPrice: Math.round(totalRoom * (property.cityTaxRate / 100) * 100) / 100, amount: Math.round(totalRoom * (property.cityTaxRate / 100) * 100) / 100 },
+            ],
+          },
+        },
+      });
+
+      // Ancillary charges (for checked-in, checked-out, and confirmed guests)
+      if (isPaid || status === ReservationStatus.CONFIRMED) {
+        // F&B (78% of stays) — $65-220 per charge, multiple charges for longer stays
+        if (seededRandom() < 0.78) {
+          const fbAmt = 65 + Math.floor(seededRandom() * 155);
+          await prisma.folioCharge.create({ data: { folioId: folio.id, type: ChargeType.FB, description: fbDescriptions[Math.floor(seededRandom() * fbDescriptions.length)], quantity: 1, unitPrice: fbAmt, amount: fbAmt, taxRate: property.taxRate, taxAmount: Math.round(fbAmt * property.taxRate) / 100 } });
+          // Second F&B charge for stays >= 3 nights (65% chance)
+          if (nights >= 3 && seededRandom() < 0.65) {
+            const fb2 = 45 + Math.floor(seededRandom() * 120);
+            await prisma.folioCharge.create({ data: { folioId: folio.id, type: ChargeType.FB, description: fbDescriptions[Math.floor(seededRandom() * fbDescriptions.length)], quantity: 1, unitPrice: fb2, amount: fb2, taxRate: property.taxRate, taxAmount: Math.round(fb2 * property.taxRate) / 100 } });
+          }
+          // Third F&B charge for stays >= 5 nights (50% chance)
+          if (nights >= 5 && seededRandom() < 0.50) {
+            const fb3 = 40 + Math.floor(seededRandom() * 100);
+            await prisma.folioCharge.create({ data: { folioId: folio.id, type: ChargeType.FB, description: fbDescriptions[Math.floor(seededRandom() * fbDescriptions.length)], quantity: 1, unitPrice: fb3, amount: fb3, taxRate: property.taxRate, taxAmount: Math.round(fb3 * property.taxRate) / 100 } });
+          }
+        }
+        // Minibar (45%)
+        if (seededRandom() < 0.45) {
+          const mbAmt = 18 + Math.floor(seededRandom() * 55);
+          await prisma.folioCharge.create({ data: { folioId: folio.id, type: ChargeType.MINIBAR, description: 'Minibar Consumption', quantity: 1, unitPrice: mbAmt, amount: mbAmt, taxRate: property.taxRate, taxAmount: Math.round(mbAmt * property.taxRate) / 100 } });
+        }
+        // Spa (28%)
+        if (seededRandom() < 0.28) {
+          const spaAmt = [95, 120, 150, 180, 220][Math.floor(seededRandom() * 5)];
+          await prisma.folioCharge.create({ data: { folioId: folio.id, type: ChargeType.SPA, description: spaDescriptions[Math.floor(seededRandom() * spaDescriptions.length)], quantity: 1, unitPrice: spaAmt, amount: spaAmt, taxRate: property.taxRate, taxAmount: Math.round(spaAmt * property.taxRate) / 100 } });
+        }
+        // Parking (38%)
+        if (seededRandom() < 0.38) {
+          const pkAmt = 45 * nights;
+          await prisma.folioCharge.create({ data: { folioId: folio.id, type: ChargeType.PARKING, description: 'Valet Parking Service', quantity: nights, unitPrice: 45, amount: pkAmt, taxRate: property.taxRate, taxAmount: Math.round(pkAmt * property.taxRate) / 100 } });
+        }
+        // Laundry (18%)
+        if (seededRandom() < 0.18) {
+          const lndAmt = 35 + Math.floor(seededRandom() * 50);
+          await prisma.folioCharge.create({ data: { folioId: folio.id, type: ChargeType.LAUNDRY, description: 'Laundry & Dry Cleaning', quantity: 1, unitPrice: lndAmt, amount: lndAmt, taxRate: property.taxRate, taxAmount: Math.round(lndAmt * property.taxRate) / 100 } });
+        }
+      }
+
+      // Payment record
+      if (paidAmount > 0) {
+        await prisma.payment.create({
+          data: {
+            reservationId: reservation.id,
+            propertyId: property.id,
+            amount: paidAmount,
+            method: (['CREDIT_CARD', 'CREDIT_CARD', 'CREDIT_CARD', 'DEBIT_CARD', 'BANK_TRANSFER'] as any)[Math.floor(seededRandom() * 5)],
+            status: 'CAPTURED',
+            reference: `PAY-${reservation.id.slice(-6).toUpperCase()}`,
+          },
+        });
+      }
+
+      reservationCount++;
+      // Next check-in: checkout + 0-1 day turnover (same-day turnover 60% of the time)
+      cursor = new Date(checkOut);
+      if (seededRandom() > 0.60) cursor.setDate(cursor.getDate() + 1);
     }
   }
-  console.log('✅ Payment records created');
+  console.log(`✅ Reservations created: ${reservationCount}`);
 
   // ─── HOUSEKEEPING TASKS ───────────────────────────────────────────────────
   const hkTypes = [HousekeepingTaskType.CHECKOUT_CLEANING, HousekeepingTaskType.STAYOVER, HousekeepingTaskType.INSPECTION, HousekeepingTaskType.DEEP_CLEAN];
@@ -622,28 +586,43 @@ async function main() {
   // ─── DEPARTMENT EXPENSES (USALI) ───────────────────────────────────────────
   const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
+  // Expenses calibrated for 56-room luxury hotel with ~$300K+ monthly revenue
+  // Industry benchmarks: Rooms dept ~27%, F&B ~68%, Spa ~58%, Undistributed ~20% of total rev
   const expenseData = [
-    // Rooms Department
-    { department: 'ROOMS', category: 'LABOR', description: 'Front desk & housekeeping staff salaries', amount: 4200, month: currentMonth },
-    { department: 'ROOMS', category: 'SUPPLIES', description: 'Guest amenities, linens, cleaning supplies', amount: 650, month: currentMonth },
-    { department: 'ROOMS', category: 'CONTRACTED', description: 'Laundry service for linens', amount: 380, month: currentMonth },
-    // F&B Department
-    { department: 'FB', category: 'LABOR', description: 'Kitchen & restaurant staff salaries', amount: 2200, month: currentMonth },
-    { department: 'FB', category: 'SUPPLIES', description: 'Food & beverage cost of goods', amount: 1100, month: currentMonth },
-    { department: 'FB', category: 'CONTRACTED', description: 'Equipment maintenance', amount: 250, month: currentMonth },
-    // Spa
-    { department: 'SPA', category: 'LABOR', description: 'Spa therapists & reception', amount: 800, month: currentMonth },
-    { department: 'SPA', category: 'SUPPLIES', description: 'Spa products & oils', amount: 200, month: currentMonth },
-    // Undistributed - Admin
-    { department: 'ADMIN', category: 'LABOR', description: 'Management & accounting salaries', amount: 3000, month: currentMonth },
-    { department: 'ADMIN', category: 'SUPPLIES', description: 'Office supplies & software', amount: 400, month: currentMonth },
-    // Undistributed - Marketing
-    { department: 'MARKETING', category: 'CONTRACTED', description: 'Digital marketing & OTA commissions', amount: 800, month: currentMonth },
-    // Undistributed - Maintenance
-    { department: 'MAINTENANCE', category: 'LABOR', description: 'Maintenance staff salaries', amount: 1000, month: currentMonth },
-    { department: 'MAINTENANCE', category: 'SUPPLIES', description: 'Repair parts & tools', amount: 500, month: currentMonth },
-    // Undistributed - Energy
-    { department: 'ENERGY', category: 'OTHER', description: 'Electricity, gas, water utilities', amount: 1400, month: currentMonth },
+    // Rooms Department (~27% of ~$280K rooms revenue = ~$76K)
+    { department: 'ROOMS', category: 'LABOR', description: 'Front desk staff salaries (8 FTEs)', amount: 38000, month: currentMonth },
+    { department: 'ROOMS', category: 'LABOR', description: 'Housekeeping staff salaries (12 FTEs)', amount: 24000, month: currentMonth },
+    { department: 'ROOMS', category: 'SUPPLIES', description: 'Guest amenities & bathroom products', amount: 4200, month: currentMonth },
+    { department: 'ROOMS', category: 'SUPPLIES', description: 'Linens, towels & bedding replacement', amount: 3800, month: currentMonth },
+    { department: 'ROOMS', category: 'CONTRACTED', description: 'Commercial laundry service', amount: 5500, month: currentMonth },
+    { department: 'ROOMS', category: 'OTHER', description: 'Guest transportation & concierge', amount: 1800, month: currentMonth },
+    // F&B Department (~65% of F&B revenue)
+    { department: 'FB', category: 'LABOR', description: 'Kitchen staff & chefs (6 FTEs)', amount: 15500, month: currentMonth },
+    { department: 'FB', category: 'LABOR', description: 'Restaurant & bar servers (8 FTEs)', amount: 10500, month: currentMonth },
+    { department: 'FB', category: 'SUPPLIES', description: 'Food cost of goods (proteins, produce)', amount: 9800, month: currentMonth },
+    { department: 'FB', category: 'SUPPLIES', description: 'Beverage & wine inventory', amount: 3500, month: currentMonth },
+    { department: 'FB', category: 'CONTRACTED', description: 'Kitchen equipment maintenance', amount: 1500, month: currentMonth },
+    // Spa (~58% of ~$18K spa revenue = ~$10.4K)
+    { department: 'SPA', category: 'LABOR', description: 'Spa therapists & reception (4 FTEs)', amount: 7200, month: currentMonth },
+    { department: 'SPA', category: 'SUPPLIES', description: 'Spa products, oils & treatment supplies', amount: 2400, month: currentMonth },
+    { department: 'SPA', category: 'CONTRACTED', description: 'Equipment maintenance', amount: 800, month: currentMonth },
+    // Undistributed - Admin & General
+    { department: 'ADMIN', category: 'LABOR', description: 'GM, accounting & HR salaries', amount: 22000, month: currentMonth },
+    { department: 'ADMIN', category: 'SUPPLIES', description: 'Office supplies, software licenses', amount: 3200, month: currentMonth },
+    { department: 'ADMIN', category: 'CONTRACTED', description: 'Legal, audit & consulting fees', amount: 4500, month: currentMonth },
+    { department: 'ADMIN', category: 'OTHER', description: 'Insurance premiums', amount: 6800, month: currentMonth },
+    // Undistributed - Sales & Marketing
+    { department: 'MARKETING', category: 'LABOR', description: 'Sales & marketing team (3 FTEs)', amount: 9500, month: currentMonth },
+    { department: 'MARKETING', category: 'CONTRACTED', description: 'OTA commissions & digital ads', amount: 8500, month: currentMonth },
+    { department: 'MARKETING', category: 'SUPPLIES', description: 'Collateral, photography & content', amount: 2200, month: currentMonth },
+    // Undistributed - Property Maintenance
+    { department: 'MAINTENANCE', category: 'LABOR', description: 'Maintenance & engineering (3 FTEs)', amount: 8500, month: currentMonth },
+    { department: 'MAINTENANCE', category: 'SUPPLIES', description: 'Repair parts, tools & materials', amount: 3200, month: currentMonth },
+    { department: 'MAINTENANCE', category: 'CONTRACTED', description: 'Elevator, HVAC & pool service', amount: 4800, month: currentMonth },
+    // Undistributed - Energy & Utilities
+    { department: 'ENERGY', category: 'OTHER', description: 'Electricity (HVAC, lighting)', amount: 9500, month: currentMonth },
+    { department: 'ENERGY', category: 'OTHER', description: 'Water, gas & sewage', amount: 4200, month: currentMonth },
+    { department: 'ENERGY', category: 'OTHER', description: 'Telecom & internet infrastructure', amount: 2800, month: currentMonth },
   ];
 
   for (const exp of expenseData) {
