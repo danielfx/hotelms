@@ -38,11 +38,11 @@ export default function ReputationPage() {
     );
   }
 
-  const avgRating = stats?.averageRating != null ? Number(stats.averageRating).toFixed(1) : reviews.length > 0 ? (reviews.reduce((s: number, r: any) => s + Number(r.rating || 0), 0) / reviews.length).toFixed(1) : "—";
-  const totalReviews = stats?.totalReviews ?? reviews.length;
+  const avgRating = stats?.avgRating != null ? Number(stats.avgRating).toFixed(1) : stats?.averageRating != null ? Number(stats.averageRating).toFixed(1) : reviews.length > 0 ? (reviews.reduce((s: number, r: any) => s + Number(r.rating || 0), 0) / reviews.length).toFixed(1) : "—";
+  const totalReviews = stats?.total ?? stats?.totalReviews ?? reviews.length;
   const positiveCount = reviews.filter((r: any) => (r.sentiment || "").toUpperCase() === "POSITIVE").length;
   const positivePct = reviews.length > 0 ? Math.round((positiveCount / reviews.length) * 100) : 0;
-  const respondedCount = reviews.filter((r: any) => r.responded || r.responseStatus === "RESPONDED").length;
+  const respondedCount = reviews.filter((r: any) => r.responded || r.responseStatus === "RESPONDED" || (r.responses && r.responses.length > 0)).length;
   const responseRate = reviews.length > 0 ? Math.round((respondedCount / reviews.length) * 100) : 0;
 
   const mappedReviews = reviews.map((r: any) => ({
@@ -54,15 +54,15 @@ export default function ReputationPage() {
     comment: r.comment || r.text || r.body || "",
     sentiment: (r.sentiment || "NEUTRAL").toUpperCase(),
     date: r.date || r.createdAt?.split("T")[0] || "—",
-    responded: r.responded ?? r.responseStatus === "RESPONDED" ?? false,
+    responded: r.responded ?? (r.responses && r.responses.length > 0) ?? r.responseStatus === "RESPONDED" ?? false,
   }));
 
   const mappedSurveys = surveys.map((s: any) => ({
     id: s.id,
     name: s.name || s.title || "Untitled Survey",
-    responses: Number(s.responses ?? s.responseCount ?? 0),
+    responses: Number(s._count?.responses ?? s.responses ?? s.responseCount ?? 0),
     avgScore: Number(s.avgScore ?? s.averageScore ?? 0).toFixed(1),
-    lastResponse: s.lastResponse || s.lastResponseAt?.split("T")[0] || "—",
+    lastResponse: s.lastResponse || s.lastResponseAt?.split("T")[0] || s.updatedAt?.split("T")[0] || "—",
   }));
 
   return (

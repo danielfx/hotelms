@@ -55,13 +55,13 @@ export default function CRMPage() {
         const campArr = Array.isArray(campData) ? campData : (campData?.data ?? campData?.campaigns ?? campData?.items ?? []);
         if (Array.isArray(campArr)) {
           setCampaigns(campArr.map((c: any) => {
-            const sent = Number(c.sent ?? c.sentCount ?? c.recipientCount ?? 0);
-            const opened = Number(c.opened ?? c.openedCount ?? c.opens ?? 0);
-            const clicked = Number(c.clicked ?? c.clickedCount ?? c.clicks ?? 0);
+            const sent = Number(c.totalSent ?? c.sent ?? c.sentCount ?? 0);
+            const opened = Number(c.totalOpened ?? c.opened ?? c.openedCount ?? 0);
+            const clicked = Number(c.totalClicked ?? c.clicked ?? c.clickedCount ?? 0);
             return {
               id: c.id ?? c._id ?? "",
               name: c.name ?? c.subject ?? "Unnamed Campaign",
-              segment: c.segment ?? c.segmentName ?? c.audience ?? "--",
+              segment: c.segment?.name ?? c.segment ?? c.segmentName ?? c.audience ?? "--",
               status: c.status ?? "DRAFT",
               sentAt: c.sentAt ?? c.sent_at ?? c.scheduledAt ?? null,
               sent,

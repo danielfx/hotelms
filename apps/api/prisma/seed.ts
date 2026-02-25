@@ -632,6 +632,344 @@ async function main() {
   }
   console.log('✅ Department expenses created:', expenseData.length);
 
+  // ─── CRM: GUEST SEGMENTS ────────────────────────────────────────────────────
+  // Update a few guests to VIP for segment demo
+  const vipGuests = guests.slice(0, 4);
+  for (const g of vipGuests) {
+    await prisma.guest.update({ where: { id: g.id }, data: { vip: true, totalStays: 3 + Math.floor(seededRandom() * 8) } });
+  }
+
+  const segments = await Promise.all([
+    prisma.guestSegment.create({
+      data: {
+        propertyId: property.id,
+        name: 'VIP Guests',
+        description: 'High-value guests with VIP status',
+        rules: [{ field: 'vip', operator: 'eq', value: true }],
+        guestCount: vipGuests.length,
+      },
+    }),
+    prisma.guestSegment.create({
+      data: {
+        propertyId: property.id,
+        name: 'Repeat Visitors',
+        description: 'Guests with 3+ previous stays',
+        rules: [{ field: 'totalStays', operator: 'gte', value: 3 }],
+        guestCount: vipGuests.length + 2,
+      },
+    }),
+    prisma.guestSegment.create({
+      data: {
+        propertyId: property.id,
+        name: 'International Travelers',
+        description: 'Guests from outside the US',
+        rules: [{ field: 'nationality', operator: 'ne', value: 'US' }],
+        guestCount: guests.filter(g => g.nationality !== 'US').length,
+      },
+    }),
+    prisma.guestSegment.create({
+      data: {
+        propertyId: property.id,
+        name: 'All Guests',
+        description: 'Complete guest database for mass communications',
+        rules: [],
+        guestCount: guests.length,
+      },
+    }),
+  ]);
+  console.log('✅ Guest segments created:', segments.length);
+
+  // ─── CRM: EMAIL CAMPAIGNS ──────────────────────────────────────────────────
+  const sentCampaign = await prisma.emailCampaign.create({
+    data: {
+      propertyId: property.id,
+      segmentId: segments[3].id, // All Guests
+      name: 'February Special Offers',
+      subject: 'Exclusive February Deals at Grand Plaza Miami',
+      body: '<h1>Exclusive February Deals</h1><p>Dear Guest, enjoy our special winter rates starting from $134/night. Book directly for the best price guarantee.</p><p>Use code FEB2026 for an additional 10% off.</p>',
+      status: 'SENT',
+      sentAt: new Date(today.getFullYear(), today.getMonth(), 5),
+      totalSent: guests.length,
+      totalOpened: Math.round(guests.length * 0.42),
+      totalClicked: Math.round(guests.length * 0.18),
+      totalBounced: 1,
+    },
+  });
+
+  // Create EmailSend records for the sent campaign
+  for (const guest of guests) {
+    if (guest.email) {
+      const opened = seededRandom() < 0.42;
+      const clicked = opened && seededRandom() < 0.43;
+      await prisma.emailSend.create({
+        data: {
+          campaignId: sentCampaign.id,
+          guestEmail: guest.email,
+          status: clicked ? 'CLICKED' : opened ? 'OPENED' : 'SENT',
+          sentAt: new Date(today.getFullYear(), today.getMonth(), 5),
+          openedAt: opened ? new Date(today.getFullYear(), today.getMonth(), 5, 10 + Math.floor(seededRandom() * 12)) : null,
+          clickedAt: clicked ? new Date(today.getFullYear(), today.getMonth(), 5, 12 + Math.floor(seededRandom() * 10)) : null,
+        },
+      });
+    }
+  }
+
+  await Promise.all([
+    prisma.emailCampaign.create({
+      data: {
+        propertyId: property.id,
+        segmentId: segments[0].id, // VIP Guests
+        name: 'VIP Loyalty Rewards',
+        subject: 'Your Exclusive VIP Benefits Await',
+        body: '<h1>VIP Loyalty Rewards</h1><p>As a valued VIP guest, enjoy complimentary room upgrades, late checkout, and exclusive access to our rooftop lounge.</p>',
+        status: 'SCHEDULED',
+        scheduledAt: new Date(today.getFullYear(), today.getMonth(), 28),
+      },
+    }),
+    prisma.emailCampaign.create({
+      data: {
+        propertyId: property.id,
+        segmentId: segments[2].id, // International Travelers
+        name: 'Spring Break Packages',
+        subject: 'Spring Break in Miami - Book Now & Save 20%',
+        body: '<h1>Spring Break Packages</h1><p>Plan your spring getaway to Miami Beach. Book our Spring Break package and save 20% on stays of 5+ nights.</p>',
+        status: 'DRAFT',
+      },
+    }),
+  ]);
+  console.log('✅ Email campaigns created');
+
+  // ─── REPUTATION: REVIEWS ────────────────────────────────────────────────────
+  const reviewsData = [
+    { source: 'GOOGLE', guestName: 'Sarah Williams', rating: 5, title: 'Absolutely stunning hotel', body: 'From the moment we walked in, the service was impeccable. The ocean view room was breathtaking and the spa was world-class. Will definitely return!', categories: ['service', 'location', 'amenities'] },
+    { source: 'BOOKING_COM', guestName: 'James Mitchell', rating: 4, title: 'Great location, excellent service', body: 'Perfect location right on the beach. Rooms are spacious and well-appointed. The restaurant serves excellent seafood. Only minor issue was slow elevator during peak hours.', categories: ['location', 'rooms', 'food'] },
+    { source: 'TRIPADVISOR', guestName: 'Elena Petrova', rating: 5, title: 'Best hotel in Miami Beach', body: 'We stayed for our anniversary and it was perfect. The staff arranged a surprise champagne setup in our suite. The pool area is gorgeous and the beach is steps away.', categories: ['service', 'rooms', 'location'] },
+    { source: 'GOOGLE', guestName: 'Robert Chen', rating: 4, title: 'Luxurious and well-maintained', body: 'Beautiful property with attention to detail. The concierge was extremely helpful with restaurant recommendations. Room was cleaned twice daily. Only wish the gym was larger.', categories: ['cleanliness', 'service', 'amenities'] },
+    { source: 'EXPEDIA', guestName: 'Maria Santos', rating: 5, title: 'Dream vacation realized', body: 'Everything exceeded our expectations. The beach service is fantastic, the cocktails are creative, and the staff remembers your name. Already booked our return visit!', categories: ['service', 'food', 'value'] },
+    { source: 'BOOKING_COM', guestName: 'Thomas Weber', rating: 3, title: 'Good hotel, noisy location', body: 'The hotel itself is beautiful and staff is friendly. However, our room faced the street and was quite noisy at night. Request an ocean-facing room for better sleep.', categories: ['location', 'rooms'] },
+    { source: 'TRIPADVISOR', guestName: 'Akiko Yamamoto', rating: 5, title: 'Outstanding hospitality', body: 'The Japanese-speaking concierge made our stay extra special. Breakfast buffet is extensive with international options. Pool area is stunning at sunset. Highly recommend!', categories: ['service', 'food', 'amenities'] },
+    { source: 'GOOGLE', guestName: 'Patricia Johnson', rating: 4, title: 'Wonderful beachfront property', body: 'Lovely hotel with direct beach access. Rooms are modern and comfortable. The spa offers excellent treatments. Would have liked more variety at breakfast though.', categories: ['rooms', 'amenities', 'food'] },
+    { source: 'AIRBNB', guestName: 'Lucas Moreau', rating: 5, title: 'Pure luxury experience', body: 'The suite was enormous and beautifully decorated. Butler service was a nice touch. The rooftop bar has incredible views. Worth every penny for a special occasion.', categories: ['rooms', 'service', 'value'] },
+    { source: 'BOOKING_COM', guestName: 'Anna Kowalski', rating: 4, title: 'Very pleasant stay', body: 'Clean, comfortable, and well-located. Staff went above and beyond when we needed a doctor for our child. The kids club is excellent. Great family hotel.', categories: ['cleanliness', 'service', 'amenities'] },
+    { source: 'EXPEDIA', guestName: 'David Thompson', rating: 2, title: 'Disappointing for the price', body: 'At this price point, I expected more. AC was inconsistent, minibar was overpriced, and the check-in process took 30 minutes. The location and pool saved the experience.', categories: ['rooms', 'value', 'service'] },
+    { source: 'GOOGLE', guestName: 'Isabella Martinez', rating: 5, title: 'A gem in South Beach', body: 'Stayed here for a conference and was blown away. Fast WiFi, great meeting facilities, and the restaurant is phenomenal. Came back the next weekend with my family!', categories: ['amenities', 'food', 'service'] },
+    { source: 'TRIPADVISOR', guestName: 'Henrik Larsson', rating: 4, title: 'Solid luxury experience', body: 'Modern rooms, excellent pool, and prime beach location. The valet parking is efficient. Restaurant prices are high but quality matches. Would recommend to friends.', categories: ['rooms', 'location', 'value'] },
+    { source: 'BOOKING_COM', guestName: 'Fatima Al-Hassan', rating: 5, title: 'Exceeded all expectations', body: 'The halal food options at the restaurant were excellent. Staff was respectful and accommodating of our needs. Beautiful property with amazing views. Perfect!', categories: ['food', 'service', 'rooms'] },
+    { source: 'GOOGLE', guestName: 'Michael O\'Brien', rating: 4, title: 'Great hotel, will return', body: 'Third time staying here and it keeps getting better. The renovation of the lobby is impressive. Love the new poolside menu. My go-to hotel in Miami.', categories: ['rooms', 'food', 'amenities'] },
+    { source: 'FACEBOOK', guestName: 'Sophie Dubois', rating: 5, title: 'Magical honeymoon stay', body: 'We chose Grand Plaza for our honeymoon and it was the best decision. The couples spa package was divine, the suite had rose petals, and the sunset dinner on the terrace was unforgettable.', categories: ['service', 'rooms', 'amenities'] },
+    { source: 'INTERNAL', guestName: 'Carlos Mendez', rating: 4, title: 'Consistent quality', body: 'Business traveler who stays frequently. The dedicated business center and fast check-in for loyalty members is appreciated. Always clean and reliable.', categories: ['service', 'cleanliness', 'amenities'] },
+  ];
+
+  const createdReviews: any[] = [];
+  for (let i = 0; i < reviewsData.length; i++) {
+    const rd = reviewsData[i];
+    const sentiment = rd.rating >= 4 ? 'POSITIVE' : rd.rating >= 3 ? 'NEUTRAL' : 'NEGATIVE';
+    const sentimentScore = (rd.rating - 3) / 2;
+    const daysAgo = Math.floor(seededRandom() * 45) + 1;
+    const publishedAt = new Date(today);
+    publishedAt.setDate(publishedAt.getDate() - daysAgo);
+
+    const review = await prisma.review.create({
+      data: {
+        propertyId: property.id,
+        source: rd.source as any,
+        guestName: rd.guestName,
+        rating: rd.rating,
+        title: rd.title,
+        body: rd.body,
+        sentiment,
+        sentimentScore,
+        categories: rd.categories,
+        publishedAt,
+      },
+    });
+    createdReviews.push(review);
+  }
+
+  // Add responses to ~60% of reviews
+  for (let i = 0; i < createdReviews.length; i++) {
+    if (seededRandom() < 0.60) {
+      const review = createdReviews[i];
+      const isNeg = reviewsData[i].rating <= 2;
+      const responseBody = isNeg
+        ? `Dear ${reviewsData[i].guestName}, thank you for your feedback. We sincerely apologize for the inconvenience during your stay. Your concerns have been shared with our management team and we are taking steps to address them. We would love the opportunity to welcome you back and provide a better experience. Please contact us directly at info@grandplazamiami.com for a special offer.`
+        : `Dear ${reviewsData[i].guestName}, thank you so much for your wonderful review! We're thrilled that you enjoyed your stay at Grand Plaza Hotel Miami. Our team works hard to create memorable experiences, and your kind words are truly appreciated. We look forward to welcoming you back soon!`;
+
+      await prisma.reviewResponse.create({
+        data: {
+          reviewId: review.id,
+          body: responseBody,
+          postedBy: users[1].id, // GM
+          postedAt: new Date(new Date(review.publishedAt!).getTime() + 24 * 60 * 60 * 1000),
+          isPublic: true,
+        },
+      });
+    }
+  }
+  console.log('✅ Reviews created:', createdReviews.length);
+
+  // ─── REPUTATION: GUEST SURVEYS ──────────────────────────────────────────────
+  const survey1 = await prisma.guestSurvey.create({
+    data: {
+      propertyId: property.id,
+      name: 'Post-Stay Satisfaction Survey',
+      description: 'Sent to all guests after checkout',
+      questions: [
+        { id: 'q1', text: 'How would you rate your overall experience?', type: 'rating' },
+        { id: 'q2', text: 'How was the check-in process?', type: 'rating' },
+        { id: 'q3', text: 'How would you rate room cleanliness?', type: 'rating' },
+        { id: 'q4', text: 'How was the staff friendliness?', type: 'rating' },
+        { id: 'q5', text: 'Would you recommend us to others?', type: 'choice', options: ['Definitely', 'Probably', 'Not sure', 'Probably not', 'Definitely not'] },
+        { id: 'q6', text: 'Any additional comments?', type: 'text' },
+      ],
+      isActive: true,
+    },
+  });
+
+  const survey2 = await prisma.guestSurvey.create({
+    data: {
+      propertyId: property.id,
+      name: 'Restaurant & Dining Feedback',
+      description: 'Feedback on F&B experiences',
+      questions: [
+        { id: 'q1', text: 'How would you rate the food quality?', type: 'rating' },
+        { id: 'q2', text: 'How was the service speed?', type: 'rating' },
+        { id: 'q3', text: 'How would you rate the menu variety?', type: 'rating' },
+        { id: 'q4', text: 'Value for money?', type: 'rating' },
+        { id: 'q5', text: 'What could we improve?', type: 'text' },
+      ],
+      isActive: true,
+    },
+  });
+
+  // Survey responses for survey 1
+  const survey1Emails = ['maria.garcia@email.com', 'john.smith@gmail.com', 'sophie.mueller@web.de', 'emma.j@icloud.com', 'yuki.tanaka@jp.com', 'isabella@email.it', 'marco.rossi@gmail.com', 'ana.m@correo.es'];
+  for (const email of survey1Emails) {
+    const q1 = 3 + Math.floor(seededRandom() * 3); // 3-5
+    const q2 = 3 + Math.floor(seededRandom() * 3);
+    const q3 = 4 + Math.floor(seededRandom() * 2); // 4-5
+    const q4 = 4 + Math.floor(seededRandom() * 2);
+    const recommend = seededRandom() < 0.7 ? 'Definitely' : seededRandom() < 0.5 ? 'Probably' : 'Not sure';
+    const overall = Math.round(((q1 + q2 + q3 + q4) / 4) * 10) / 10;
+
+    await prisma.surveyResponse.create({
+      data: {
+        surveyId: survey1.id,
+        guestEmail: email,
+        answers: { q1, q2, q3, q4, q5: recommend, q6: seededRandom() < 0.4 ? 'Great stay, no complaints!' : null },
+        overallScore: overall,
+      },
+    });
+  }
+
+  // Survey responses for survey 2
+  const survey2Emails = ['john.smith@gmail.com', 'carlos.r@hotmail.com', 'ahmed.h@yahoo.com', 'david.kim@korea.com', 'maria.garcia@email.com'];
+  for (const email of survey2Emails) {
+    const q1 = 3 + Math.floor(seededRandom() * 3);
+    const q2 = 3 + Math.floor(seededRandom() * 3);
+    const q3 = 3 + Math.floor(seededRandom() * 3);
+    const q4 = 3 + Math.floor(seededRandom() * 3);
+    const overall = Math.round(((q1 + q2 + q3 + q4) / 4) * 10) / 10;
+
+    await prisma.surveyResponse.create({
+      data: {
+        surveyId: survey2.id,
+        guestEmail: email,
+        answers: { q1, q2, q3, q4, q5: seededRandom() < 0.5 ? 'More vegetarian options please' : null },
+        overallScore: overall,
+      },
+    });
+  }
+  console.log('✅ Guest surveys created with responses');
+
+  // ─── BILLING: SUBSCRIPTION PLANS ────────────────────────────────────────────
+  const starterPlan = await prisma.subscriptionPlan.create({
+    data: {
+      name: 'Starter',
+      slug: 'starter',
+      monthlyPrice: 49,
+      yearlyPrice: 470,
+      maxRooms: 20,
+      maxProperties: 1,
+      maxUsers: 3,
+      features: ['Up to 20 rooms', 'Reservations & Front Desk', 'Basic Reporting', 'Email Support', '1 Property'],
+    },
+  });
+
+  const professionalPlan = await prisma.subscriptionPlan.create({
+    data: {
+      name: 'Professional',
+      slug: 'professional',
+      monthlyPrice: 149,
+      yearlyPrice: 1430,
+      maxRooms: 100,
+      maxProperties: 3,
+      maxUsers: 10,
+      features: ['Up to 100 rooms', 'Channel Manager', 'Revenue Intelligence', 'CRM & Marketing', 'USALI Reports', 'Priority Support', '3 Properties'],
+    },
+  });
+
+  const enterprisePlan = await prisma.subscriptionPlan.create({
+    data: {
+      name: 'Enterprise',
+      slug: 'enterprise',
+      monthlyPrice: 399,
+      yearlyPrice: 3830,
+      maxRooms: null, // unlimited
+      maxProperties: null,
+      maxUsers: null,
+      features: ['Unlimited rooms', 'Multi-property Portfolio', 'Advanced Analytics', 'API Access', 'Custom Integrations', 'Dedicated Account Manager', '24/7 Phone Support'],
+    },
+  });
+  console.log('✅ Subscription plans created');
+
+  // ─── BILLING: SUBSCRIPTION ──────────────────────────────────────────────────
+  const periodStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  const subscription = await prisma.subscription.create({
+    data: {
+      propertyId: property.id,
+      planId: professionalPlan.id,
+      status: 'ACTIVE',
+      billingInterval: 'MONTHLY',
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
+      trialEndsAt: null,
+    },
+  });
+
+  // ─── BILLING: INVOICES ──────────────────────────────────────────────────────
+  const invoiceMonths = [
+    { offset: -3, status: 'PAID' },
+    { offset: -2, status: 'PAID' },
+    { offset: -1, status: 'PAID' },
+    { offset: 0, status: 'PENDING' },
+  ];
+
+  for (let i = 0; i < invoiceMonths.length; i++) {
+    const im = invoiceMonths[i];
+    const invStart = new Date(today.getFullYear(), today.getMonth() + im.offset, 1);
+    const invEnd = new Date(today.getFullYear(), today.getMonth() + im.offset + 1, 0);
+    const amount = 149;
+    const tax = Math.round(amount * 0.07 * 100) / 100;
+
+    await prisma.billingInvoice.create({
+      data: {
+        subscriptionId: subscription.id,
+        invoiceNo: `INV-2026-${String(invStart.getMonth() + 1).padStart(2, '0')}-001`,
+        amount,
+        tax,
+        total: amount + tax,
+        status: im.status,
+        periodStart: invStart,
+        periodEnd: invEnd,
+        paidAt: im.status === 'PAID' ? new Date(invStart.getFullYear(), invStart.getMonth(), 3) : null,
+      },
+    });
+  }
+  console.log('✅ Billing data created');
+
   console.log('\n🎉 Seed complete!');
   console.log('\n📋 Login credentials:');
   console.log('  Super Admin:  admin@hotelms.com       / Admin1234!');

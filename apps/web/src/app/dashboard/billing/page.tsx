@@ -49,8 +49,8 @@ export default function BillingPage() {
   }
 
   const subPlanName = subscription?.planName || subscription?.plan?.name || "";
-  const subPrice = subscription ? Number(subscription.price ?? subscription.plan?.price ?? 0) : 0;
-  const subInterval = subscription?.interval || subscription?.plan?.interval || "month";
+  const subPrice = subscription ? Number(subscription.plan?.monthlyPrice ?? subscription.price ?? subscription.plan?.price ?? 0) : 0;
+  const subInterval = subscription?.billingInterval?.toLowerCase() === "yearly" ? "year" : subscription?.interval || subscription?.plan?.interval || "month";
   const subRenews = subscription?.currentPeriodEnd || "";
 
   return (
@@ -106,12 +106,13 @@ export default function BillingPage() {
         ) : (
           <div className="grid grid-cols-3 gap-6">
             {plans.map((plan: any) => {
-              const planPrice = Number(plan.price ?? 0);
-              const planInterval = plan.interval || "month";
+              const planPrice = Number(plan.monthlyPrice ?? plan.price ?? 0);
+              const planInterval = "month";
               const isCurrentPlan = subPlanName && plan.name === subPlanName;
+              const recommended = plan.recommended || plan.slug === "professional";
               return (
-                <div key={plan.id} className={`bg-white rounded-xl border-2 p-6 ${plan.recommended ? "border-blue-500 shadow-lg" : "border-slate-200"} relative`}>
-                  {plan.recommended && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-blue-600 text-white text-xs font-medium rounded-full">Recommended</div>}
+                <div key={plan.id} className={`bg-white rounded-xl border-2 p-6 ${recommended ? "border-blue-500 shadow-lg" : "border-slate-200"} relative`}>
+                  {recommended && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-blue-600 text-white text-xs font-medium rounded-full">Recommended</div>}
                   <h3 className="font-bold text-lg text-slate-900">{plan.name}</h3>
                   <div className="mt-2">
                     <span className="text-3xl font-bold text-slate-900">${planPrice.toFixed(2)}</span>
@@ -124,7 +125,7 @@ export default function BillingPage() {
                       </li>
                     ))}
                   </ul>
-                  <button className={`w-full mt-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${isCurrentPlan ? "bg-slate-100 text-slate-500 cursor-default" : plan.recommended ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}>
+                  <button className={`w-full mt-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${isCurrentPlan ? "bg-slate-100 text-slate-500 cursor-default" : recommended ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-800"}`}>
                     {isCurrentPlan ? "Current Plan" : "Switch to " + plan.name}
                   </button>
                 </div>
@@ -154,15 +155,18 @@ export default function BillingPage() {
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((inv: any) => (
-                  <tr key={inv.id} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer">
-                    <td className="p-4 font-medium text-slate-900">{inv.number || inv.invoiceNumber || inv.id}</td>
-                    <td className="p-4 text-slate-600">{inv.period || "-"}</td>
-                    <td className="p-4 text-right font-medium text-slate-900">${Number(inv.amount ?? 0).toFixed(2)}</td>
-                    <td className="p-4 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.status === "PAID" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>{inv.status || "PENDING"}</span></td>
-                    <td className="p-4 text-sm text-slate-500">{inv.date || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : "-")}</td>
-                  </tr>
-                ))}
+                {invoices.map((inv: any) => {
+                  const period = inv.period || (inv.periodStart && inv.periodEnd ? `${new Date(inv.periodStart).toLocaleDateString()} - ${new Date(inv.periodEnd).toLocaleDateString()}` : "-");
+                  return (
+                    <tr key={inv.id} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer">
+                      <td className="p-4 font-medium text-slate-900">{inv.invoiceNo || inv.number || inv.invoiceNumber || inv.id}</td>
+                      <td className="p-4 text-slate-600">{period}</td>
+                      <td className="p-4 text-right font-medium text-slate-900">${Number(inv.total ?? inv.amount ?? 0).toFixed(2)}</td>
+                      <td className="p-4 text-center"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.status === "PAID" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>{inv.status || "PENDING"}</span></td>
+                      <td className="p-4 text-sm text-slate-500">{inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : inv.date || (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : "-")}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
