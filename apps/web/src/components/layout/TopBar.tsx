@@ -1,7 +1,7 @@
 "use client";
-import { usePathname } from "next/navigation";
-import { Bell, Plus } from "lucide-react";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Bell, Plus, LogOut } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { NewReservationModal } from "@/components/reservations/NewReservationModal";
 import { initials } from "@/lib/utils";
 
@@ -17,8 +17,25 @@ const PAGE_TITLES: Record<string, string> = {
 
 export function TopBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [showModal, setShowModal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const title = PAGE_TITLES[pathname] ?? "HotelMS";
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function handleLogout() {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("user");
+    router.push("/login");
+  }
 
   return (
     <>
@@ -35,8 +52,21 @@ export function TopBar() {
             <Bell size={15} className="text-slate-500" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
-          <div className="w-9 h-9 rounded-xl bg-blue-500 flex items-center justify-center text-white text-xs font-bold cursor-pointer">
-            {initials("Admin User")}
+          <div className="relative" ref={menuRef}>
+            <div
+              onClick={() => setShowMenu(!showMenu)}
+              className="w-9 h-9 rounded-xl bg-blue-500 flex items-center justify-center text-white text-xs font-bold cursor-pointer">
+              {initials("Admin User")}
+            </div>
+            {showMenu && (
+              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                  <LogOut size={14} /> Log out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
