@@ -1,5 +1,6 @@
 // Typed API client for HotelMS frontend
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+// Use relative URL so requests go through Next.js rewrites (avoids CORS)
+const API_URL = "";
 
 class ApiClient {
   private baseUrl: string;
