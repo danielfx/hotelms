@@ -418,7 +418,13 @@
     "cloneRatePlan": "Clone Rate Plan",
     "newPlanName": "New Plan Name",
     "newCode": "New Code",
-    "cloning": "Cloning..."
+    "cloning": "Cloning...",
+    "bulkPreviewWillSet": "Will set",
+    "bulkPreviewFor": "for",
+    "bulkPreviewFrom": "from",
+    "bulkPreviewTo": "to",
+    "bulkPreviewOn": "on",
+    "bulkPreviewOnly": "only"
   },
   "groups": {
     "title": "Groups & Events",

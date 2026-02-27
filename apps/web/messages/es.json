@@ -418,7 +418,13 @@
     "cloneRatePlan": "Clonar Plan de Tarifa",
     "newPlanName": "Nombre del Nuevo Plan",
     "newCode": "Nuevo Código",
-    "cloning": "Clonando..."
+    "cloning": "Clonando...",
+    "bulkPreviewWillSet": "Se establecerá",
+    "bulkPreviewFor": "para",
+    "bulkPreviewFrom": "desde",
+    "bulkPreviewTo": "hasta",
+    "bulkPreviewOn": "en",
+    "bulkPreviewOnly": "solamente"
   },
   "groups": {
     "title": "Grupos y Eventos",

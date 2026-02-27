@@ -601,10 +601,10 @@ export default function RatesPage() {
 
               {bulkForm.price > 0 && bulkForm.dateFrom && bulkForm.dateTo && (
                 <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
-                  Will set <strong>{fmt(bulkForm.price)}</strong> for{" "}
+                  {t("bulkPreviewWillSet")} <strong>{fmt(bulkForm.price)}</strong> {t("bulkPreviewFor")}{" "}
                   <strong>{ROOM_TYPES.find(r => r.code === bulkForm.roomTypeCode)?.name}</strong>{" "}
-                  from {bulkForm.dateFrom} to {bulkForm.dateTo}
-                  {bulkForm.daysOfWeek.length > 0 && ` on ${bulkForm.daysOfWeek.map(d => DAYS[d]).join(", ")} only`}
+                  {t("bulkPreviewFrom")} {bulkForm.dateFrom} {t("bulkPreviewTo")} {bulkForm.dateTo}
+                  {bulkForm.daysOfWeek.length > 0 && ` ${t("bulkPreviewOn")} ${bulkForm.daysOfWeek.map(d => DAYS[d]).join(", ")} ${t("bulkPreviewOnly")}`}
                 </div>
               )}
 
