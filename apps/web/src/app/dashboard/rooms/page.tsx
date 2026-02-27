@@ -1,17 +1,19 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { BedDouble, Plus, LayoutGrid, List, RefreshCw } from "lucide-react";
 import api from "@/lib/api";
 
 // Status config
 const STATUS = {
-  AVAILABLE:    { label: "Available",    bg: "#ECFDF5", text: "#059669", dot: "#10B981" },
-  OCCUPIED:     { label: "Occupied",     bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
-  CLEANING:     { label: "Cleaning",     bg: "#FFFBEB", text: "#D97706", dot: "#F59E0B" },
-  MAINTENANCE:  { label: "Maintenance",  bg: "#FEF2F2", text: "#DC2626", dot: "#EF4444" },
-  RESERVED:     { label: "Reserved",     bg: "#F5F3FF", text: "#7C3AED", dot: "#8B5CF6" },
-  OUT_OF_ORDER: { label: "Out of Order", bg: "#F8FAFC", text: "#94A3B8", dot: "#CBD5E1" },
-  INSPECTING:   { label: "Inspecting",  bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
+  AVAILABLE:    { key: "statusAvailable",    bg: "#ECFDF5", text: "#059669", dot: "#10B981" },
+  OCCUPIED:     { key: "statusOccupied",     bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
+  CLEANING:     { key: "statusCleaning",     bg: "#FFFBEB", text: "#D97706", dot: "#F59E0B" },
+  MAINTENANCE:  { key: "statusMaintenance",  bg: "#FEF2F2", text: "#DC2626", dot: "#EF4444" },
+  RESERVED:     { key: "statusReserved",     bg: "#F5F3FF", text: "#7C3AED", dot: "#8B5CF6" },
+  OUT_OF_ORDER: { key: "statusOutOfOrder",   bg: "#F8FAFC", text: "#94A3B8", dot: "#CBD5E1" },
+  INSPECTING:   { key: "statusInspecting",   bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
 } as const;
 
 interface Room {
@@ -24,7 +26,15 @@ interface Room {
   reservations: any[];
 }
 
+const TYPE_COLORS: Record<string, string> = {
+  STD: "#3B82F6", DLX: "#8B5CF6", PRM: "#10B981", STE: "#F59E0B",
+  STANDARD: "#3B82F6", DELUXE: "#8B5CF6", PREMIUM: "#10B981", SUITE: "#F59E0B",
+};
+
 export default function RoomsPage() {
+  const router = useRouter();
+  const t = useTranslations("rooms");
+  const tc = useTranslations("common");
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [floorFilter, setFloorFilter] = useState<number | "all">("all");
@@ -34,12 +44,7 @@ export default function RoomsPage() {
   const [selected, setSelected] = useState<Room | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const TYPE_COLORS: Record<string, string> = {
-    STD: "#3B82F6", DLX: "#8B5CF6", PRM: "#10B981", STE: "#F59E0B",
-    STANDARD: "#3B82F6", DELUXE: "#8B5CF6", PREMIUM: "#10B981", SUITE: "#F59E0B",
-  };
-
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.rooms.list();
@@ -69,22 +74,25 @@ export default function RoomsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchRooms(); }, []);
+  useEffect(() => { fetchRooms(); }, [fetchRooms]);
 
   // Derive floors and room types from actual data
-  const floors = [...new Set(rooms.map(r => r.floor))].sort((a, b) => a - b);
-  const roomTypes = ["all", ...new Set(rooms.map(r => r.roomType.code))];
-  const typeNames: Record<string, string> = { all: "All Types" };
-  rooms.forEach(r => { typeNames[r.roomType.code] = r.roomType.name; });
+  const floors = useMemo(() => [...new Set(rooms.map(r => r.floor))].sort((a, b) => a - b), [rooms]);
+  const roomTypes = useMemo(() => ["all", ...new Set(rooms.map(r => r.roomType.code))], [rooms]);
+  const typeNames = useMemo(() => {
+    const names: Record<string, string> = { all: "All Types" };
+    rooms.forEach(r => { names[r.roomType.code] = r.roomType.name; });
+    return names;
+  }, [rooms]);
 
-  const filtered = rooms.filter(r => {
+  const filtered = useMemo(() => rooms.filter(r => {
     if (floorFilter !== "all" && r.floor !== floorFilter) return false;
     if (typeFilter !== "all" && r.roomType.code !== typeFilter) return false;
     if (statusFilter !== "all" && r.status !== statusFilter) return false;
     return true;
-  });
+  }), [rooms, floorFilter, typeFilter, statusFilter]);
 
   const stats = Object.entries(STATUS).map(([k, v]) => ({
     key: k as keyof typeof STATUS,
@@ -103,6 +111,12 @@ export default function RoomsPage() {
       setRooms(rs => rs.map(r => r.id === id ? { ...r, status: newStatus } : r));
       setSelected(r => r && r.id === id ? { ...r, status: newStatus } : r);
     }
+  };
+
+  // Helper to get translated status label
+  const statusLabel = (statusKey: keyof typeof STATUS) => {
+    const cfg = STATUS[statusKey] ?? STATUS.AVAILABLE;
+    return t(cfg.key as any);
   };
 
   if (loading) {
@@ -128,7 +142,7 @@ export default function RoomsPage() {
       <div className="flex flex-wrap gap-2">
         <button onClick={() => setStatusFilter("all")}
           className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${statusFilter === "all" ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-500 border-slate-200"}`}>
-          All ({rooms.length})
+          {tc("all")} ({rooms.length})
         </button>
         {stats.map(s => (
           <button key={s.key} onClick={() => setStatusFilter(s.key)}
@@ -139,7 +153,7 @@ export default function RoomsPage() {
               borderColor: statusFilter === s.key ? s.dot + "60" : "#E2E8F0",
             }}>
             <span className="w-2 h-2 rounded-full" style={{ background: s.dot }} />
-            {s.label} ({s.count})
+            {t(s.key as any)} ({s.count})
           </button>
         ))}
       </div>
@@ -150,15 +164,15 @@ export default function RoomsPage() {
           {(["all", ...floors] as (number | "all")[]).map(f => (
             <button key={f} onClick={() => setFloorFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${floorFilter === f ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-              {f === "all" ? "All Floors" : `Floor ${f}`}
+              {f === "all" ? t("allFloors") : `${tc("floor")} ${f}`}
             </button>
           ))}
         </div>
         <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-          {roomTypes.map(t => (
-            <button key={t} onClick={() => setTypeFilter(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${typeFilter === t ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-              {typeNames[t] ?? t}
+          {roomTypes.map(tp => (
+            <button key={tp} onClick={() => setTypeFilter(tp)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${typeFilter === tp ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+              {typeNames[tp] ?? tp}
             </button>
           ))}
         </div>
@@ -171,7 +185,7 @@ export default function RoomsPage() {
             <button onClick={() => setView("list")} className={`p-1.5 rounded-lg ${view === "list" ? "bg-white shadow-sm" : ""}`}><List size={14} className={view === "list" ? "text-slate-700" : "text-slate-400"} /></button>
           </div>
           <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-1.5 text-xs">
-            <Plus size={13} /> Add Room
+            <Plus size={13} /> {t("addRoom")}
           </button>
         </div>
       </div>
@@ -183,10 +197,10 @@ export default function RoomsPage() {
         return (
           <div key={floor}>
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <span>Floor {floor}</span>
+              <span>{tc("floor")} {floor}</span>
               <span className="text-slate-300">—</span>
-              <span>{floorRooms.length} rooms</span>
-              <span className="ml-1 text-emerald-500">{floorRooms.filter(r => r.status === "AVAILABLE").length} available</span>
+              <span>{floorRooms.length} {tc("rooms")}</span>
+              <span className="ml-1 text-emerald-500">{floorRooms.filter(r => r.status === "AVAILABLE").length} {t("statusAvailable").toLowerCase()}</span>
             </div>
             {view === "grid" ? (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
@@ -208,11 +222,11 @@ export default function RoomsPage() {
                 })}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-                <table className="w-full">
+              <div className="overflow-x-auto bg-white rounded-2xl border border-slate-100">
+                <table className="w-full min-w-[640px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      {["#", "Room", "Type", "Floor", "Rate", "Status", "Tasks", ""].map(h => (
+                      {["#", tc("room"), tc("type"), tc("floor"), "Rate", tc("status"), "Tasks", ""].map(h => (
                         <th key={h} className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-2.5">{h}</th>
                       ))}
                     </tr>
@@ -233,7 +247,7 @@ export default function RoomsPage() {
                           <td className="px-4 py-3">
                             <span className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: cfg.text }}>
                               <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.dot }} />
-                              {cfg.label}
+                              {statusLabel(room.status)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400">{room.hkTasks.length > 0 ? `${room.hkTasks.length} pending` : "—"}</td>
@@ -265,14 +279,14 @@ export default function RoomsPage() {
             <div className="p-5 border-b border-slate-100" style={{ background: `linear-gradient(135deg, ${selected.roomType.color}12, transparent)` }}>
               <div className="flex justify-between">
                 <div>
-                  <div className="text-2xl font-extrabold text-slate-900">Room {selected.number}</div>
-                  <div className="text-xs font-semibold mt-0.5" style={{ color: selected.roomType.color }}>{selected.roomType.name} · Floor {selected.floor}</div>
+                  <div className="text-2xl font-extrabold text-slate-900">{tc("room")} {selected.number}</div>
+                  <div className="text-xs font-semibold mt-0.5" style={{ color: selected.roomType.color }}>{selected.roomType.name} · {tc("floor")} {selected.floor}</div>
                 </div>
                 <button onClick={() => setSelected(null)} className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 text-xs">✕</button>
               </div>
               <div className="mt-2.5 flex items-center gap-1.5 text-xs font-semibold" style={{ color: (STATUS[selected.status] ?? STATUS.AVAILABLE).text }}>
                 <span className="w-2 h-2 rounded-full" style={{ background: (STATUS[selected.status] ?? STATUS.AVAILABLE).dot }} />
-                {(STATUS[selected.status] ?? STATUS.AVAILABLE).label}
+                {statusLabel(selected.status)}
               </div>
             </div>
 
@@ -281,7 +295,7 @@ export default function RoomsPage() {
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { label: "Rate", value: `$${selected.roomType.basePrice}/night` },
-                  { label: "Floor", value: selected.floor },
+                  { label: tc("floor"), value: selected.floor },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-slate-50 rounded-xl p-3">
                     <div className="text-[10px] text-slate-400 font-medium">{label}</div>
@@ -292,7 +306,7 @@ export default function RoomsPage() {
 
               {/* Change status */}
               <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Change Status</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t("changeStatus")}</div>
                 <div className="space-y-1">
                   {(Object.entries(STATUS) as [keyof typeof STATUS, typeof STATUS[keyof typeof STATUS]][]).map(([k, v]) => (
                     <button key={k} onClick={() => handleStatusChange(selected.id, k)}
@@ -303,7 +317,7 @@ export default function RoomsPage() {
                         borderColor: selected.status === k ? v.dot + "50" : "#F1F5F9",
                       }}>
                       <span className="w-2 h-2 rounded-full" style={{ background: v.dot }} />
-                      {v.label}
+                      {t(v.key as any)}
                       {selected.status === k && <span className="ml-auto font-bold text-[10px]">✓</span>}
                     </button>
                   ))}
@@ -312,14 +326,119 @@ export default function RoomsPage() {
 
               {/* Actions */}
               <div className="space-y-2">
-                <button className="w-full btn-primary text-xs py-2">+ New Reservation</button>
-                <button className="w-full btn-ghost text-xs py-2">View History</button>
-                <button className="w-full btn-ghost text-xs py-2 text-red-500 border-red-200 hover:bg-red-50">Mark Out of Order</button>
+                <button onClick={() => router.push('/dashboard/reservations')} className="w-full btn-primary text-xs py-2">+ {t("newReservation")}</button>
+                <button onClick={() => router.push('/dashboard/folio')} className="w-full btn-ghost text-xs py-2">{t("viewHistory")}</button>
+                <button onClick={async () => {
+                  try {
+                    await api.rooms.updateStatus(selected.id, 'OUT_OF_ORDER');
+                    fetchRooms();
+                  } catch (e: any) {
+                    alert(e.message);
+                  }
+                }} className="w-full btn-ghost text-xs py-2 text-red-500 border-red-200 hover:bg-red-50">{t("markOutOfOrder")}</button>
               </div>
             </div>
           </div>
         </>
       )}
+
+      {/* Add Room Modal */}
+      {showAddModal && (
+        <AddRoomModal
+          roomTypes={rooms.map(r => ({ code: r.roomType.code, name: r.roomType.name }))}
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => { setShowAddModal(false); fetchRooms(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddRoomModal({ roomTypes, onClose, onSaved }: {
+  roomTypes: { code: string; name: string }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const t = useTranslations("rooms");
+  const tc = useTranslations("common");
+  const [number, setNumber] = useState("");
+  const [floor, setFloor] = useState(1);
+  const [roomTypeId, setRoomTypeId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Deduplicate room types
+  const uniqueTypes = roomTypes.filter((tp, i, arr) => arr.findIndex(x => x.code === tp.code) === i);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      await api.rooms.create({ number, floor, roomTypeId });
+      onSaved();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <h2 className="text-lg font-bold text-slate-900">{t("addRoom")}</h2>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 text-xs">✕</button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">{t("roomNumber")}</label>
+            <input
+              type="text"
+              value={number}
+              onChange={e => setNumber(e.target.value)}
+              required
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+              placeholder="e.g. 101"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">{tc("floor")}</label>
+            <input
+              type="number"
+              value={floor}
+              onChange={e => setFloor(Number(e.target.value))}
+              required
+              min={1}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">{t("roomType")}</label>
+            <select
+              value={roomTypeId}
+              onChange={e => setRoomTypeId(e.target.value)}
+              required
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            >
+              <option value="">Select a room type</option>
+              {uniqueTypes.map(tp => (
+                <option key={tp.code} value={tp.code}>{tp.name} ({tp.code})</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} className="btn-ghost text-xs px-4 py-2">{tc("cancel")}</button>
+            <button type="submit" disabled={saving} className="btn-primary text-xs px-4 py-2 disabled:opacity-50">
+              {saving ? tc("saving") : tc("save")}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

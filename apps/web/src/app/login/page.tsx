@@ -1,13 +1,20 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import api from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("login");
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const demoUsers = [
     { label: "General Manager", email: "manager@grandplaza.com", password: "Manager123!" },
@@ -74,14 +81,10 @@ export default function LoginPage() {
         {/* Main copy */}
         <div className="relative space-y-6">
           <h1 className="text-5xl font-extrabold text-white leading-tight tracking-tight">
-            Manage your<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">
-              entire hotel
-            </span><br />
-            from one place.
+            {t("manageEntireHotel")}
           </h1>
           <p className="text-slate-400 text-lg max-w-sm leading-relaxed">
-            PMS, Channel Manager, Booking Engine, Revenue Management and Guest Experience — unified.
+            {t("pmsDescription")}
           </p>
         </div>
 
@@ -111,13 +114,13 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-extrabold text-slate-900">Welcome back</h2>
-            <p className="text-slate-500 mt-1.5 text-sm">Sign in to your property account</p>
+            <h2 className="text-2xl font-extrabold text-slate-900">{t("welcomeBack")}</h2>
+            <p className="text-slate-500 mt-1.5 text-sm">{t("signInSubtitle")}</p>
           </div>
 
           {/* Demo users */}
           <div className="mb-6">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Quick demo login</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t("quickDemoLogin")}</p>
             <div className="grid grid-cols-2 gap-2">
               {demoUsers.map((u) => (
                 <button
@@ -135,7 +138,7 @@ export default function LoginPage() {
 
           <div className="flex items-center gap-3 mb-6">
             <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs text-slate-400">or sign in manually</span>
+            <span className="text-xs text-slate-400">{t("orSignInManually")}</span>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
 
@@ -149,7 +152,7 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Email address</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">{t("email")}</label>
               <input
                 type="email"
                 required
@@ -162,8 +165,8 @@ export default function LoginPage() {
 
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="text-xs font-semibold text-slate-600">Password</label>
-                <a href="/forgot-password" className="text-xs text-blue-500 hover:text-blue-600 font-medium">Forgot password?</a>
+                <label className="text-xs font-semibold text-slate-600">{t("password")}</label>
+                <button type="button" onClick={() => setShowForgot(true)} className="text-xs text-blue-500 hover:text-blue-600 font-medium">{t("forgotPassword")}</button>
               </div>
               <div className="relative">
                 <input
@@ -179,7 +182,7 @@ export default function LoginPage() {
                   onClick={() => setShowPass((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-medium"
                 >
-                  {showPass ? "Hide" : "Show"}
+                  {showPass ? t("hide") : t("show")}
                 </button>
               </div>
             </div>
@@ -195,20 +198,55 @@ export default function LoginPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Signing in…
+                  {t("signingIn")}
                 </span>
               ) : (
-                "Sign in"
+                t("signIn")
               )}
             </button>
           </form>
 
           <p className="text-center text-xs text-slate-400 mt-6">
-            By signing in, you agree to the{" "}
-            <a href="#" className="text-blue-500 hover:underline">Terms of Service</a>{" "}
-            and{" "}
-            <a href="#" className="text-blue-500 hover:underline">Privacy Policy</a>.
+            {t("termsIntro")}{" "}
+            <button type="button" onClick={() => alert("Terms of Service: Standard hotel management SaaS terms apply. Usage is subject to our service agreement.")} className="text-blue-500 hover:underline">{t("termsOfService")}</button>{" "}
+            {t("and")}{" "}
+            <button type="button" onClick={() => alert("Privacy Policy: Your data is encrypted and stored securely. We comply with GDPR and industry standards.")} className="text-blue-500 hover:underline">{t("privacyPolicy")}</button>.
           </p>
+
+          {/* Forgot password modal */}
+          {showForgot && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+                <h3 className="font-bold text-slate-900">{t("resetPassword")}</h3>
+                {forgotSent ? (
+                  <div className="text-sm text-emerald-600 bg-emerald-50 rounded-xl p-4">
+                    Reset link sent to <strong>{forgotEmail}</strong>. Check your inbox.
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-slate-500">Enter your email and we&apos;ll send you a reset link.</p>
+                    <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                    <button type="button" onClick={async () => {
+                      if (!forgotEmail) return;
+                      setForgotLoading(true);
+                      try {
+                        await api.auth.forgotPassword(forgotEmail);
+                        setForgotSent(true);
+                      } catch (e: any) { alert(e.message || "Failed to send reset link"); }
+                      setForgotLoading(false);
+                    }} disabled={forgotLoading || !forgotEmail}
+                      className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold disabled:opacity-50">
+                      {forgotLoading ? t("sending") : t("sendResetLink")}
+                    </button>
+                  </>
+                )}
+                <button type="button" onClick={() => { setShowForgot(false); setForgotSent(false); setForgotEmail(""); }}
+                  className="w-full py-2 text-sm text-slate-500 hover:text-slate-700">{t("backToLogin")}</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

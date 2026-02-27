@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Calendar, Users, Search, Star, MapPin, Wifi, Car, Coffee, Dumbbell, Waves } from "lucide-react";
 
 const PROPERTY = {
@@ -27,6 +28,7 @@ const AMENITY_ICONS: Record<string, any> = {
 
 export default function BookPage() {
   const router = useRouter();
+  const t = useTranslations("book");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [adults, setAdults] = useState(1);
@@ -62,7 +64,7 @@ export default function BookPage() {
             {Array.from({ length: PROPERTY.stars }).map((_, i) => (
               <Star key={i} size={14} className="fill-amber-400 text-amber-400" />
             ))}
-            <span className="text-amber-400 text-xs font-bold ml-1">{PROPERTY.stars}-Star Hotel</span>
+            <span className="text-amber-400 text-xs font-bold ml-1">{t("starHotel", { n: PROPERTY.stars })}</span>
           </div>
 
           <h1 className="text-5xl font-black tracking-tight leading-tight mb-2">{PROPERTY.name}</h1>
@@ -75,7 +77,7 @@ export default function BookPage() {
             </div>
             <div className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-full px-3 py-1">
               <span className="font-bold text-emerald-400">{PROPERTY.rating}</span>
-              <span className="text-emerald-300">Exceptional · {PROPERTY.reviews.toLocaleString()} reviews</span>
+              <span className="text-emerald-300">{t("exceptional")} · {PROPERTY.reviews.toLocaleString()} {t("reviews")}</span>
             </div>
           </div>
         </div>
@@ -89,7 +91,7 @@ export default function BookPage() {
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
               <Calendar size={15} className="text-slate-400 shrink-0" />
               <div className="flex-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Check-in</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("checkIn")}</div>
                 <input type="date" value={checkIn} min={today} onChange={e => setCheckIn(e.target.value)}
                   className="w-full text-sm font-semibold text-slate-900 bg-transparent outline-none cursor-pointer" />
               </div>
@@ -103,7 +105,7 @@ export default function BookPage() {
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl hover:bg-slate-50 transition-colors">
               <Calendar size={15} className="text-slate-400 shrink-0" />
               <div className="flex-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Check-out</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("checkOut")}</div>
                 <input type="date" value={checkOut} min={checkIn || today} onChange={e => setCheckOut(e.target.value)}
                   className="w-full text-sm font-semibold text-slate-900 bg-transparent outline-none cursor-pointer" />
               </div>
@@ -124,7 +126,7 @@ export default function BookPage() {
               className="flex items-center gap-2 px-4 py-3 rounded-xl hover:bg-slate-50 transition-colors">
               <Users size={15} className="text-slate-400" />
               <div className="text-left">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guests</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("guests")}</div>
                 <div className="text-sm font-semibold text-slate-900">
                   {adults} adult{adults > 1 ? "s" : ""}
                   {children > 0 ? `, ${children} child${children > 1 ? "ren" : ""}` : ""}
@@ -135,11 +137,11 @@ export default function BookPage() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowGuests(false)} />
                 <div className="absolute top-full left-0 mt-2 bg-white rounded-2xl border border-slate-100 shadow-xl p-4 z-50 w-64">
-                  {[["Adults", adults, setAdults, 1, 10] as const, ["Children", children, setChildren, 0, 6] as const].map(([label, val, set, min, max]) => (
+                  {[[t("adults"), adults, setAdults, 1, 10] as const, [t("children"), children, setChildren, 0, 6] as const].map(([label, val, set, min, max]) => (
                     <div key={label} className="flex items-center justify-between py-3 border-b border-slate-50 last:border-0">
                       <div>
                         <div className="text-sm font-semibold text-slate-900">{label}</div>
-                        {label === "Children" && <div className="text-[10px] text-slate-400">Ages 0–12</div>}
+                        {label === t("children") && <div className="text-[10px] text-slate-400">{t("childrenAges")}</div>}
                       </div>
                       <div className="flex items-center gap-3">
                         <button onClick={() => set(Math.max(min, val - 1))}
@@ -161,8 +163,8 @@ export default function BookPage() {
           <div className="flex-1 min-w-32">
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl hover:bg-slate-50 transition-colors">
               <div className="flex-1">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Promo Code</div>
-                <input value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="Optional"
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("promoCode")}</div>
+                <input value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder={t("optional")}
                   className="w-full text-sm font-semibold text-slate-900 bg-transparent outline-none placeholder:text-slate-300" />
               </div>
             </div>
@@ -172,7 +174,7 @@ export default function BookPage() {
           <button onClick={handleSearch} disabled={!checkIn || !checkOut}
             className="flex items-center gap-2.5 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-200 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20">
             <Search size={16} />
-            Search
+            {t("search")}
           </button>
         </div>
       </div>
@@ -193,8 +195,8 @@ export default function BookPage() {
           {[
             { label: "Check-in", value: `From ${PROPERTY.checkInTime}` },
             { label: "Check-out", value: `Until ${PROPERTY.checkOutTime}` },
-            { label: "Cancellation", value: "Free up to 48h" },
-            { label: "Pets", value: "Not allowed" },
+            { label: t("cancellation"), value: t("freeUpTo48h") },
+            { label: t("pets"), value: t("notAllowed") },
           ].map(({ label, value }) => (
             <div key={label} className="bg-white/5 border border-white/10 rounded-2xl p-4">
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</div>

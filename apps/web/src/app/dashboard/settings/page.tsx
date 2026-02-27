@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import api from "@/lib/api";
 import { Building2, Save, MapPin, Globe, Phone, Mail, Clock, Wifi, Shield, Bell, Loader2 } from "lucide-react";
 
@@ -13,11 +14,21 @@ const DEFAULT_PROPERTY = {
 };
 
 export default function SettingsPage() {
+  const t = useTranslations("settings");
+  const tc = useTranslations("common");
   const [tab, setTab] = useState<"general" | "operations" | "notifications">("general");
   const [form, setForm] = useState(DEFAULT_PROPERTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [notifications, setNotifications] = useState<Record<string, boolean>>({
+    newReservation: true,
+    cancellations: true,
+    guestCheckIn: false,
+    housekeepingAlerts: true,
+    channelSyncErrors: true,
+    revenueAlerts: false,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -88,7 +99,7 @@ export default function SettingsPage() {
         cityTaxRate: form.cityTaxRate,
         resortFee: form.resortFee,
       });
-      setSaveMsg("Settings saved successfully.");
+      setSaveMsg(t("settingsSaved"));
       setTimeout(() => setSaveMsg(""), 3000);
     } catch (err: any) {
       setSaveMsg(`Failed to save: ${err.message || "Unknown error"}`);
@@ -98,16 +109,16 @@ export default function SettingsPage() {
   };
 
   const tabs = [
-    { id: "general" as const, label: "General", icon: Building2 },
-    { id: "operations" as const, label: "Operations", icon: Clock },
-    { id: "notifications" as const, label: "Notifications", icon: Bell },
+    { id: "general" as const, label: t("general"), icon: Building2 },
+    { id: "operations" as const, label: t("operations"), icon: Clock },
+    { id: "notifications" as const, label: t("notificationsTab"), icon: Bell },
   ];
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="animate-spin text-blue-500" size={32} />
-        <span className="ml-3 text-slate-500 text-sm">Loading settings...</span>
+        <span className="ml-3 text-slate-500 text-sm">{t("loadingSettings")}</span>
       </div>
     );
   }
@@ -116,8 +127,8 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Property Settings</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage your property configuration</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
+          <p className="text-slate-500 text-sm mt-1">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-3">
           {saveMsg && (
@@ -125,16 +136,16 @@ export default function SettingsPage() {
           )}
           <button onClick={handleSave} disabled={saving}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save Changes
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {t("saveChanges")}
           </button>
         </div>
       </div>
 
-      <div className="flex gap-6">
-        <div className="w-48 space-y-1">
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${tab === t.id ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-50"}`}>
-              <t.icon size={16} /> {t.label}
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className="w-full md:w-48 flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible">
+          {tabs.map(tb => (
+            <button key={tb.id} onClick={() => setTab(tb.id)} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all whitespace-nowrap ${tab === tb.id ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-600 hover:bg-slate-50"}`}>
+              <tb.icon size={16} /> {tb.label}
             </button>
           ))}
         </div>
@@ -142,19 +153,19 @@ export default function SettingsPage() {
         <div className="flex-1 bg-white rounded-xl border border-slate-200 p-6">
           {tab === "general" && (
             <div className="space-y-6">
-              <h3 className="font-semibold text-slate-900">General Information</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <h3 className="font-semibold text-slate-900">{t("generalInfo")}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
-                  { label: "Property Name", key: "name", icon: Building2 },
-                  { label: "Property Code", key: "code", icon: Shield },
-                  { label: "Phone", key: "phone", icon: Phone },
-                  { label: "Email", key: "email", icon: Mail },
-                  { label: "Website", key: "website", icon: Globe },
-                  { label: "Address", key: "address", icon: MapPin },
-                  { label: "City", key: "city", icon: MapPin },
-                  { label: "State", key: "state", icon: MapPin },
-                  { label: "Country", key: "country", icon: Globe },
-                  { label: "Postal Code", key: "postalCode", icon: MapPin },
+                  { label: t("propertyName"), key: "name", icon: Building2 },
+                  { label: t("propertyCode"), key: "code", icon: Shield },
+                  { label: tc("phone"), key: "phone", icon: Phone },
+                  { label: tc("email"), key: "email", icon: Mail },
+                  { label: t("website"), key: "website", icon: Globe },
+                  { label: t("address"), key: "address", icon: MapPin },
+                  { label: t("city"), key: "city", icon: MapPin },
+                  { label: t("state"), key: "state", icon: MapPin },
+                  { label: t("country"), key: "country", icon: Globe },
+                  { label: t("postalCode"), key: "postalCode", icon: MapPin },
                 ].map(field => (
                   <div key={field.key}>
                     <label className="block text-sm text-slate-600 mb-1">{field.label}</label>
@@ -169,17 +180,17 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Total Rooms</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("totalRooms")}</label>
                   <input type="number" value={form.totalRooms} onChange={e => setForm({ ...form, totalRooms: +e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Total Floors</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("totalFloors")}</label>
                   <input type="number" value={form.totalFloors} onChange={e => setForm({ ...form, totalFloors: +e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Star Rating</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("starRating")}</label>
                   <input type="number" value={form.starRating} min={1} max={5} onChange={e => setForm({ ...form, starRating: +e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
@@ -188,18 +199,18 @@ export default function SettingsPage() {
 
           {tab === "operations" && (
             <div className="space-y-6">
-              <h3 className="font-semibold text-slate-900">Operations Settings</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <h3 className="font-semibold text-slate-900">{t("operationsSettings")}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Check-in Time</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("checkInTime")}</label>
                   <input type="time" value={form.checkInTime} onChange={e => setForm({ ...form, checkInTime: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Check-out Time</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("checkOutTime")}</label>
                   <input type="time" value={form.checkOutTime} onChange={e => setForm({ ...form, checkOutTime: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Timezone</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("timezone")}</label>
                   <select value={form.timezone} onChange={e => setForm({ ...form, timezone: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="America/New_York">Eastern Time</option>
                     <option value="America/Chicago">Central Time</option>
@@ -211,7 +222,7 @@ export default function SettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Currency</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("currency")}</label>
                   <select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="USD">USD - US Dollar</option>
                     <option value="EUR">EUR - Euro</option>
@@ -220,18 +231,18 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
-              <h3 className="font-semibold text-slate-900 pt-4">Tax & Fees</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <h3 className="font-semibold text-slate-900 pt-4">{t("taxAndFees")}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Tax Rate (%)</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("taxRate")}</label>
                   <input type="number" step="0.01" value={form.taxRate} onChange={e => setForm({ ...form, taxRate: +e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">City Tax Rate (%)</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("cityTaxRate")}</label>
                   <input type="number" step="0.01" value={form.cityTaxRate} onChange={e => setForm({ ...form, cityTaxRate: +e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-600 mb-1">Resort Fee ($)</label>
+                  <label className="block text-sm text-slate-600 mb-1">{t("resortFee")}</label>
                   <input type="number" step="0.01" value={form.resortFee} onChange={e => setForm({ ...form, resortFee: +e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
@@ -240,22 +251,35 @@ export default function SettingsPage() {
 
           {tab === "notifications" && (
             <div className="space-y-6">
-              <h3 className="font-semibold text-slate-900">Notification Preferences</h3>
+              <h3 className="font-semibold text-slate-900">{t("notificationPrefs")}</h3>
               {[
-                { label: "New Reservation", desc: "Get notified when a new reservation is created", enabled: true },
-                { label: "Cancellations", desc: "Get notified when a reservation is cancelled", enabled: true },
-                { label: "Guest Check-in", desc: "Get notified when guests check in", enabled: false },
-                { label: "Housekeeping Alerts", desc: "Get notified about housekeeping issues", enabled: true },
-                { label: "Channel Sync Errors", desc: "Get notified when channel sync fails", enabled: true },
-                { label: "Revenue Alerts", desc: "Get notified about revenue milestones", enabled: false },
+                { key: "newReservation", label: t("newReservation"), desc: t("newReservationDesc") },
+                { key: "cancellations", label: t("cancellations"), desc: t("cancellationsDesc") },
+                { key: "guestCheckIn", label: t("guestCheckIn"), desc: t("guestCheckInDesc") },
+                { key: "housekeepingAlerts", label: t("housekeepingAlerts"), desc: t("housekeepingAlertsDesc") },
+                { key: "channelSyncErrors", label: t("channelSyncErrors"), desc: t("channelSyncErrorsDesc") },
+                { key: "revenueAlerts", label: t("revenueAlerts"), desc: t("revenueAlertsDesc") },
               ].map(n => (
-                <div key={n.label} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+                <div key={n.key} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
                   <div>
                     <div className="text-sm font-medium text-slate-900">{n.label}</div>
                     <div className="text-xs text-slate-500">{n.desc}</div>
                   </div>
-                  <button className={`w-10 h-6 rounded-full transition-colors ${n.enabled ? "bg-blue-600" : "bg-slate-200"}`}>
-                    <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${n.enabled ? "translate-x-5" : "translate-x-1"}`} />
+                  <button
+                    className={`w-10 h-6 rounded-full transition-colors ${notifications[n.key] ? "bg-blue-600" : "bg-slate-200"}`}
+                    onClick={async () => {
+                      const prev = { ...notifications };
+                      const newVal = { ...notifications, [n.key]: !notifications[n.key] };
+                      setNotifications(newVal);
+                      try {
+                        await api.properties.updateSettings({ notifications: newVal });
+                      } catch (e: any) {
+                        setNotifications(prev);
+                        alert(e.message || "Failed to update settings");
+                      }
+                    }}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${notifications[n.key] ? "translate-x-5" : "translate-x-1"}`} />
                   </button>
                 </div>
               ))}

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import api from "@/lib/api";
+import { type Locale, defaultLocale } from "@/i18n/config";
 
 export interface Room {
   id: string;
@@ -36,6 +37,20 @@ interface HotelState {
   loading: boolean;
   fetchData: () => Promise<void>;
   addReservation: (r: Reservation) => void;
+  // i18n
+  locale: Locale;
+  setLocale: (l: Locale) => void;
+  // Sidebar (mobile)
+  sidebarOpen: boolean;
+  toggleSidebar: () => void;
+  closeSidebar: () => void;
+}
+
+function getInitialLocale(): Locale {
+  if (typeof window === "undefined") return defaultLocale;
+  const stored = localStorage.getItem("locale");
+  if (stored === "en" || stored === "es") return stored;
+  return defaultLocale;
 }
 
 export const useHotelStore = create<HotelState>((set, get) => ({
@@ -43,6 +58,20 @@ export const useHotelStore = create<HotelState>((set, get) => ({
   reservations: [],
   loaded: false,
   loading: false,
+
+  // i18n
+  locale: defaultLocale,
+  setLocale: (l: Locale) => {
+    set({ locale: l });
+    localStorage.setItem("locale", l);
+    document.cookie = `locale=${l};path=/;max-age=31536000`;
+    window.location.reload();
+  },
+
+  // Sidebar (mobile)
+  sidebarOpen: false,
+  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+  closeSidebar: () => set({ sidebarOpen: false }),
 
   fetchData: async () => {
     if (get().loading) return;

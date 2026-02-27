@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, Plus, ChevronDown, ChevronUp, BedDouble,
   LogIn, LogOut, X, Clock, Users, DollarSign, Calendar
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -31,33 +32,47 @@ interface Reservation {
   checkedInAt?: string;
 }
 
-const STATUS_CFG: Record<ResStatus, { label: string; bg: string; text: string; dot: string }> = {
-  CONFIRMED:    { label: "Confirmed",   bg: "#ECFDF5", text: "#059669", dot: "#10B981" },
-  PENDING:      { label: "Pending",     bg: "#FFFBEB", text: "#D97706", dot: "#F59E0B" },
-  CHECKED_IN:   { label: "Checked In",  bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
-  CHECKED_OUT:  { label: "Checked Out", bg: "#F8FAFC", text: "#64748B", dot: "#94A3B8" },
-  CANCELLED:    { label: "Cancelled",   bg: "#FEF2F2", text: "#DC2626", dot: "#EF4444" },
-  NO_SHOW:      { label: "No Show",     bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
+// Colors/styles only – labels resolved via translations inside the component
+const STATUS_COLORS: Record<ResStatus, { bg: string; text: string; dot: string }> = {
+  CONFIRMED:    { bg: "#ECFDF5", text: "#059669", dot: "#10B981" },
+  PENDING:      { bg: "#FFFBEB", text: "#D97706", dot: "#F59E0B" },
+  CHECKED_IN:   { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
+  CHECKED_OUT:  { bg: "#F8FAFC", text: "#64748B", dot: "#94A3B8" },
+  CANCELLED:    { bg: "#FEF2F2", text: "#DC2626", dot: "#EF4444" },
+  NO_SHOW:      { bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
 };
 
-const SOURCE_CFG: Record<ResSource, { label: string; icon: string }> = {
-  DIRECT:     { label: "Direct",     icon: "🏨" },
-  BOOKING_COM:{ label: "Booking.com",icon: "🔵" },
-  EXPEDIA:    { label: "Expedia",    icon: "🟡" },
-  AIRBNB:     { label: "Airbnb",     icon: "🔴" },
-  PHONE:      { label: "Phone",      icon: "📞" },
-  WALK_IN:    { label: "Walk-in",    icon: "🚶" },
+const STATUS_LABEL_KEYS: Record<ResStatus, string> = {
+  CONFIRMED: "confirmed",
+  PENDING: "pendingStatus",
+  CHECKED_IN: "checkedIn",
+  CHECKED_OUT: "checkedOut",
+  CANCELLED: "cancelled",
+  NO_SHOW: "noShow",
+};
+
+const SOURCE_ICONS: Record<ResSource, string> = {
+  DIRECT: "🏨",
+  BOOKING_COM: "🔵",
+  EXPEDIA: "🟡",
+  AIRBNB: "🔴",
+  PHONE: "📞",
+  WALK_IN: "🚶",
+};
+
+const SOURCE_LABEL_KEYS: Record<ResSource, string> = {
+  DIRECT: "direct",
+  BOOKING_COM: "bookingCom",
+  EXPEDIA: "expedia",
+  AIRBNB: "airbnb",
+  PHONE: "phoneSource",
+  WALK_IN: "walkIn",
 };
 
 const fmt = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 const initials = (f: string, l: string) => ((f?.[0] ?? "") + (l?.[0] ?? "")).toUpperCase();
-const today = () => new Date().toISOString().split("T")[0];
-
 const pad2 = (n: number) => String(n).padStart(2, "0");
-const genId = () => `RES-${Math.floor(1000 + Math.random() * 9000)}`;
-
-const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
 
 function normalizeReservation(r: any): Reservation {
   const checkIn = (r.checkIn ?? "").split("T")[0];
@@ -96,18 +111,20 @@ function normalizeReservation(r: any): Reservation {
 
 // ─── COMPONENTS ──────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: ResStatus }) {
-  const cfg = STATUS_CFG[status] ?? STATUS_CFG.CONFIRMED;
+function StatusBadge({ status, label }: { status: ResStatus; label: string }) {
+  const cfg = STATUS_COLORS[status] ?? STATUS_COLORS.CONFIRMED;
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
       style={{ background: cfg.bg, color: cfg.text }}>
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.dot }} />
-      {cfg.label}
+      {label}
     </span>
   );
 }
 
-function CheckInModal({ res, onConfirm, onClose }: { res: Reservation; onConfirm: (id: string) => void; onClose: () => void }) {
+function CheckInModal({ res, onConfirm, onClose }: { res: Reservation; onConfirm: (id: string, passportNo?: string, notes?: string) => void; onClose: () => void }) {
+  const t = useTranslations("reservations");
+  const tc = useTranslations("common");
   const [passportNo, setPassportNo] = useState("");
   const [notes, setNotes] = useState("");
   return (
@@ -115,7 +132,7 @@ function CheckInModal({ res, onConfirm, onClose }: { res: Reservation; onConfirm
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <div>
-            <h3 className="font-bold text-slate-900">Check In Guest</h3>
+            <h3 className="font-bold text-slate-900">{t("checkInGuest")}</h3>
             <p className="text-xs text-slate-400 mt-0.5">{res.confirmationNo}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><X size={14} /></button>
@@ -127,7 +144,7 @@ function CheckInModal({ res, onConfirm, onClose }: { res: Reservation; onConfirm
             </div>
             <div>
               <div className="font-semibold text-slate-900">{res.guest.firstName} {res.guest.lastName}</div>
-              <div className="text-xs text-slate-500">Room {res.room.number} · {res.room.roomType.name} · {res.nights} night{res.nights > 1 ? "s" : ""}</div>
+              <div className="text-xs text-slate-500">{tc("room")} {res.room.number} · {res.room.roomType.name} · {res.nights} {res.nights > 1 ? tc("nights") : tc("night")}</div>
             </div>
           </div>
           {res.notes && <div className="text-xs bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-amber-700">📝 {res.notes}</div>}
@@ -137,15 +154,15 @@ function CheckInModal({ res, onConfirm, onClose }: { res: Reservation; onConfirm
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-500 block mb-1.5">Check-in Notes</label>
+            <label className="text-xs font-semibold text-slate-500 block mb-1.5">{tc("notes")}</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Any notes for this check-in..."
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
           </div>
           <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button onClick={() => { onConfirm(res.id); onClose(); }}
+            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">{tc("cancel")}</button>
+            <button onClick={() => { onConfirm(res.id, passportNo, notes); onClose(); }}
               className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold flex items-center justify-center gap-2">
-              <LogIn size={15} /> Confirm Check In
+              <LogIn size={15} /> {tc("confirm")} {t("checkIn")}
             </button>
           </div>
         </div>
@@ -154,7 +171,9 @@ function CheckInModal({ res, onConfirm, onClose }: { res: Reservation; onConfirm
   );
 }
 
-function CheckOutModal({ res, onConfirm, onClose }: { res: Reservation; onConfirm: (id: string) => void; onClose: () => void }) {
+function CheckOutModal({ res, onConfirm, onClose }: { res: Reservation; onConfirm: (id: string, paymentMethod?: string, sendInvoiceEmail?: boolean) => void; onClose: () => void }) {
+  const t = useTranslations("reservations");
+  const tc = useTranslations("common");
   const [payMethod, setPayMethod] = useState("CREDIT_CARD");
   const [sendInvoice, setSendInvoice] = useState(true);
   return (
@@ -162,7 +181,7 @@ function CheckOutModal({ res, onConfirm, onClose }: { res: Reservation; onConfir
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <div>
-            <h3 className="font-bold text-slate-900">Check Out Guest</h3>
+            <h3 className="font-bold text-slate-900">{t("checkOutGuest")}</h3>
             <p className="text-xs text-slate-400 mt-0.5">{res.confirmationNo}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><X size={14} /></button>
@@ -174,12 +193,12 @@ function CheckOutModal({ res, onConfirm, onClose }: { res: Reservation; onConfir
             </div>
             <div>
               <div className="font-semibold text-slate-900">{res.guest.firstName} {res.guest.lastName}</div>
-              <div className="text-xs text-slate-500">Room {res.room.number} · {res.nights} nights</div>
+              <div className="text-xs text-slate-500">{tc("room")} {res.room.number} · {res.nights} {tc("nights")}</div>
             </div>
           </div>
           {/* Folio summary */}
           <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-            <div className="flex justify-between text-sm"><span className="text-slate-500">Total charges</span><span className="font-semibold">{fmt(res.totalAmount)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-slate-500">{t("total")}</span><span className="font-semibold">{fmt(res.totalAmount)}</span></div>
             <div className="flex justify-between text-sm"><span className="text-slate-500">Paid</span><span className="font-semibold text-emerald-600">{fmt(res.paidAmount)}</span></div>
             <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-bold">
               <span>Balance due</span>
@@ -203,10 +222,10 @@ function CheckOutModal({ res, onConfirm, onClose }: { res: Reservation; onConfir
             Send invoice by email
           </label>
           <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button onClick={() => { onConfirm(res.id); onClose(); }}
+            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">{tc("cancel")}</button>
+            <button onClick={() => { onConfirm(res.id, payMethod, sendInvoice); onClose(); }}
               className="flex-[2] py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold flex items-center justify-center gap-2">
-              <LogOut size={15} /> Confirm Check Out
+              <LogOut size={15} /> {tc("confirm")} {t("checkOut")}
             </button>
           </div>
         </div>
@@ -215,28 +234,56 @@ function CheckOutModal({ res, onConfirm, onClose }: { res: Reservation; onConfir
   );
 }
 
-function NewReservationModal({ onSave, onClose }: { onSave: (r: Reservation) => void; onClose: () => void }) {
-  const [form, setForm] = useState({
+function getToday() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function getTomorrow() {
+  const d = new Date(); d.setDate(d.getDate() + 1);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function NewReservationModal({ onSave, onClose }: { onSave: () => void; onClose: () => void }) {
+  const t = useTranslations("reservations");
+  const tc = useTranslations("common");
+  const [form, setForm] = useState(() => ({
     firstName: "", lastName: "", email: "", phone: "",
     roomNumber: "101", roomType: "Standard", basePrice: 89,
-    checkIn: today(), checkOut: tomorrow.toISOString().split("T")[0],
+    checkIn: getToday(), checkOut: getTomorrow(),
     adults: 1, source: "DIRECT" as ResSource, notes: "", eta: "",
-  });
+  }));
+  const [saving, setSaving] = useState(false);
   const nights = Math.max(1, Math.ceil((new Date(form.checkOut).getTime() - new Date(form.checkIn).getTime()) / 86400000));
   const total = form.basePrice * nights;
 
-  const handleSave = () => {
+  const sourceLabel = (s: ResSource) => t(SOURCE_LABEL_KEYS[s] || s);
+
+  const handleSave = async () => {
     if (!form.firstName || !form.lastName) return;
-    onSave({
-      id: String(Date.now()), confirmationNo: genId(),
-      guest: { firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, nationality: "US" },
-      room: { number: form.roomNumber, roomType: { name: form.roomType, basePrice: form.basePrice } },
-      checkIn: form.checkIn, checkOut: form.checkOut, nights,
-      adults: form.adults, status: "CONFIRMED", source: form.source,
-      totalAmount: total, paidAmount: 0, balanceDue: total,
-      notes: form.notes, eta: form.eta,
-    });
-    onClose();
+    setSaving(true);
+    try {
+      await api.reservations.create({
+        roomNumber: form.roomNumber,
+        guestData: {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone,
+        },
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+        adults: form.adults,
+        source: form.source,
+        notes: form.notes,
+        eta: form.eta,
+      });
+      onSave();
+      onClose();
+    } catch (e: any) {
+      alert(e.message || "Failed to create reservation");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const set = (k: keyof typeof form, v: any) => setForm(f => ({ ...f, [k]: v }));
@@ -245,50 +292,50 @@ function NewReservationModal({ onSave, onClose }: { onSave: (r: Reservation) => 
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h3 className="font-bold text-slate-900 text-lg">New Reservation</h3>
+          <h3 className="font-bold text-slate-900 text-lg">{t("title")}</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><X size={14} /></button>
         </div>
         <div className="p-6 space-y-4">
           {/* Guest */}
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Guest Information</div>
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t("guest")}</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">First Name *</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("name")} *</label>
               <input value={form.firstName} onChange={e => set("firstName", e.target.value)} placeholder="John"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Last Name *</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("name")} *</label>
               <input value={form.lastName} onChange={e => set("lastName", e.target.value)} placeholder="Smith"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Email</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("email")}</label>
               <input value={form.email} onChange={e => set("email", e.target.value)} type="email" placeholder="guest@email.com"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Phone</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("phone")}</label>
               <input value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+1 555 0100"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
             </div>
           </div>
 
           {/* Stay */}
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2">Stay Details</div>
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2">{tc("details")}</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Check-in *</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">{t("checkIn")} *</label>
               <input value={form.checkIn} onChange={e => set("checkIn", e.target.value)} type="date"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Check-out *</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">{t("checkOut")} *</label>
               <input value={form.checkOut} onChange={e => set("checkOut", e.target.value)} type="date"
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Room</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">{t("room")}</label>
               <input value={form.roomNumber} onChange={e => set("roomNumber", e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
             </div>
@@ -298,11 +345,11 @@ function NewReservationModal({ onSave, onClose }: { onSave: (r: Reservation) => 
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1">Source</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">{t("source")}</label>
               <select value={form.source} onChange={e => set("source", e.target.value as ResSource)}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm">
-                {(Object.keys(SOURCE_CFG) as ResSource[]).map(s => (
-                  <option key={s} value={s}>{SOURCE_CFG[s].icon} {SOURCE_CFG[s].label}</option>
+                {(Object.keys(SOURCE_ICONS) as ResSource[]).map(s => (
+                  <option key={s} value={s}>{SOURCE_ICONS[s]} {sourceLabel(s)}</option>
                 ))}
               </select>
             </div>
@@ -314,7 +361,7 @@ function NewReservationModal({ onSave, onClose }: { onSave: (r: Reservation) => 
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-500 block mb-1">Notes / Special Requests</label>
+            <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("notes")}</label>
             <textarea value={form.notes} onChange={e => set("notes", e.target.value)} rows={2} placeholder="Anniversary, dietary restrictions, etc."
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
           </div>
@@ -324,15 +371,15 @@ function NewReservationModal({ onSave, onClose }: { onSave: (r: Reservation) => 
             <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
               <div className="text-xs font-bold text-emerald-700 mb-2">Booking Summary</div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-600">{nights} night{nights > 1 ? "s" : ""} × {fmt(form.basePrice)}</span>
+                <span className="text-slate-600">{nights} {nights > 1 ? tc("nights") : tc("night")} × {fmt(form.basePrice)}</span>
                 <span className="font-extrabold text-slate-900">{fmt(total)}</span>
               </div>
             </div>
           )}
         </div>
         <div className="flex gap-3 p-6 pt-0">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-          <button onClick={handleSave} className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold">Create Reservation</button>
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">{tc("cancel")}</button>
+          <button onClick={handleSave} disabled={saving} className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold disabled:opacity-50">{saving ? tc("saving") : tc("create")}</button>
         </div>
       </div>
     </div>
@@ -342,6 +389,8 @@ function NewReservationModal({ onSave, onClose }: { onSave: (r: Reservation) => 
 // ─── MAIN PAGE ───────────────────────────────────────────────────────────────
 
 export default function ReservationsPage() {
+  const t = useTranslations("reservations");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -352,7 +401,10 @@ export default function ReservationsPage() {
   const [checkOutModal, setCheckOutModal] = useState<Reservation | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
 
-  const fetchReservations = async () => {
+  const statusLabel = (s: ResStatus) => t(STATUS_LABEL_KEYS[s] || s);
+  const sourceLabel = (s: ResSource) => t(SOURCE_LABEL_KEYS[s] || s);
+
+  const fetchReservations = useCallback(async () => {
     try {
       setLoading(true);
       const data = await api.reservations.list();
@@ -363,65 +415,69 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchReservations(); }, []);
+  useEffect(() => { fetchReservations(); }, [fetchReservations]);
 
-  const todayStr = today();
-  const arrivalsToday = reservations.filter(r => r.checkIn === todayStr && ["CONFIRMED", "PENDING"].includes(r.status)).length;
-  const departuresToday = reservations.filter(r => r.checkOut === todayStr && r.status === "CHECKED_IN").length;
-  const inHouse = reservations.filter(r => r.status === "CHECKED_IN").length;
+  const [todayStr, setTodayStr] = useState("");
+  useEffect(() => { setTodayStr(getToday()); }, []);
+  const { arrivalsToday, departuresToday, inHouse } = useMemo(() => ({
+    arrivalsToday: reservations.filter(r => r.checkIn === todayStr && ["CONFIRMED", "PENDING"].includes(r.status)).length,
+    departuresToday: reservations.filter(r => r.checkOut === todayStr && r.status === "CHECKED_IN").length,
+    inHouse: reservations.filter(r => r.status === "CHECKED_IN").length,
+  }), [reservations, todayStr]);
 
-  const filtered = reservations.filter(r => {
+  const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    const matchQ = !q || `${r.guest.firstName} ${r.guest.lastName} ${r.confirmationNo} ${r.room.number} ${r.guest.email}`.toLowerCase().includes(q);
-    let matchS = true;
-    if (statusFilter === "arrivals") {
-      matchS = r.checkIn === todayStr && ["CONFIRMED", "PENDING"].includes(r.status);
-    } else if (statusFilter === "departures") {
-      matchS = r.checkOut === todayStr && r.status === "CHECKED_IN";
-    } else if (statusFilter !== "all") {
-      matchS = r.status === statusFilter;
-    }
-    return matchQ && matchS;
-  });
+    return reservations.filter(r => {
+      const matchQ = !q || `${r.guest.firstName} ${r.guest.lastName} ${r.confirmationNo} ${r.room.number} ${r.guest.email}`.toLowerCase().includes(q);
+      let matchS = true;
+      if (statusFilter === "arrivals") {
+        matchS = r.checkIn === todayStr && ["CONFIRMED", "PENDING"].includes(r.status);
+      } else if (statusFilter === "departures") {
+        matchS = r.checkOut === todayStr && r.status === "CHECKED_IN";
+      } else if (statusFilter !== "all") {
+        matchS = r.status === statusFilter;
+      }
+      return matchQ && matchS;
+    });
+  }, [reservations, search, statusFilter, todayStr]);
 
-  const handleCheckIn = async (id: string) => {
+  const handleCheckIn = async (id: string, passportNo?: string, notes?: string) => {
+    setReservations(rs => rs.map(r => r.id === id ? { ...r, status: "CHECKED_IN" as ResStatus, checkedInAt: new Date().toISOString() } : r));
     try {
-      await api.reservations.checkIn(id);
-      await fetchReservations();
+      await api.reservations.checkIn(id, { passportNo, notes });
     } catch (err) {
       console.error("Check-in failed:", err);
-      // Fallback: update locally
-      setReservations(rs => rs.map(r => r.id === id ? { ...r, status: "CHECKED_IN" as ResStatus, checkedInAt: new Date().toISOString() } : r));
+      fetchReservations();
     }
   };
-  const handleCheckOut = async (id: string) => {
+  const handleCheckOut = async (id: string, paymentMethod?: string, sendInvoiceEmail?: boolean) => {
+    setReservations(rs => rs.map(r => r.id === id ? { ...r, status: "CHECKED_OUT" as ResStatus, balanceDue: 0 } : r));
     try {
-      await api.reservations.checkOut(id);
-      await fetchReservations();
+      await api.reservations.checkOut(id, { paymentMethod, sendInvoiceEmail });
     } catch (err) {
       console.error("Check-out failed:", err);
-      setReservations(rs => rs.map(r => r.id === id ? { ...r, status: "CHECKED_OUT" as ResStatus, balanceDue: 0 } : r));
+      fetchReservations();
     }
   };
   const handleCancel = async (id: string) => {
+    setReservations(rs => rs.map(r => r.id === id ? { ...r, status: "CANCELLED" as ResStatus } : r));
     try {
       await api.reservations.cancel(id);
-      await fetchReservations();
     } catch (err) {
       console.error("Cancel failed:", err);
-      setReservations(rs => rs.map(r => r.id === id ? { ...r, status: "CANCELLED" as ResStatus } : r));
+      fetchReservations();
     }
   };
-  const handleAdd = (res: Reservation) => {
-    setReservations(rs => [res, ...rs]);
+  const handleAdd = () => {
+    fetchReservations();
   };
 
   if (loading) {
     return (
       <div className="space-y-5">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />
           ))}
@@ -443,12 +499,12 @@ export default function ReservationsPage() {
   return (
     <div className="space-y-5">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { icon: <LogIn size={16} />, label: "Arrivals Today", value: arrivalsToday, color: "#3B82F6", filter: "arrivals" as const },
-          { icon: <LogOut size={16} />, label: "Departures Today", value: departuresToday, color: "#10B981", filter: "departures" as const },
-          { icon: <BedDouble size={16} />, label: "In House", value: inHouse, color: "#8B5CF6", filter: "CHECKED_IN" as const },
-          { icon: <Clock size={16} />, label: "Pending", value: reservations.filter(r => r.status === "PENDING").length, color: "#F59E0B", filter: "PENDING" as const },
+          { icon: <LogIn size={16} />, label: t("arrivalsToday"), value: arrivalsToday, color: "#3B82F6", filter: "arrivals" as const },
+          { icon: <LogOut size={16} />, label: t("departuresToday"), value: departuresToday, color: "#10B981", filter: "departures" as const },
+          { icon: <BedDouble size={16} />, label: t("inHouse"), value: inHouse, color: "#8B5CF6", filter: "CHECKED_IN" as const },
+          { icon: <Clock size={16} />, label: t("pending"), value: reservations.filter(r => r.status === "PENDING").length, color: "#F59E0B", filter: "PENDING" as const },
         ].map(({ icon, label, value, color, filter }) => (
           <button key={label} onClick={() => setStatusFilter(f => f === filter ? "all" : filter)}
             className="bg-white rounded-2xl border border-slate-100 p-4 text-left hover:shadow-md transition-all">
@@ -465,11 +521,11 @@ export default function ReservationsPage() {
       <div className="flex flex-wrap gap-2">
         <button onClick={() => setStatusFilter("all")}
           className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${statusFilter === "all" ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"}`}>
-          All ({reservations.length})
+          {tc("all")} ({reservations.length})
         </button>
-        {(Object.keys(STATUS_CFG) as ResStatus[]).map(s => {
+        {(Object.keys(STATUS_COLORS) as ResStatus[]).map(s => {
           const cnt = reservations.filter(r => r.status === s).length;
-          const cfg = STATUS_CFG[s];
+          const cfg = STATUS_COLORS[s];
           return (
             <button key={s} onClick={() => setStatusFilter(f => f === s ? "all" : s)}
               className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
@@ -478,7 +534,7 @@ export default function ReservationsPage() {
                 color: statusFilter === s ? cfg.text : "#64748B",
                 borderColor: statusFilter === s ? cfg.dot + "50" : "#E2E8F0",
               }}>
-              {cfg.label} ({cnt})
+              {statusLabel(s)} ({cnt})
             </button>
           );
         })}
@@ -488,118 +544,119 @@ export default function ReservationsPage() {
       <div className="flex gap-3">
         <div className="relative flex-1">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, confirmation #, room…"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("searchPlaceholder")}
             className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
         </div>
         <button onClick={() => setShowNewModal(true)} className="btn-primary flex items-center gap-1.5 text-xs shrink-0">
-          <Plus size={13} /> New Reservation
+          <Plus size={13} /> {tc("new")} {t("title")}
         </button>
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
-              {["Guest", "Conf. #", "Room", "Check-in", "Check-out", "Balance", "Source", "Status", ""].map(h => (
-                <th key={h} className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-3">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={9} className="text-center text-slate-300 py-16 text-sm">No reservations found</td></tr>
-            )}
-            {filtered.map(r => {
-              const isOpen = expanded === r.id;
-              const sourceCfg = SOURCE_CFG[r.source] ?? { label: r.source, icon: "🏨" };
-              return (
-                <>
-                  <tr key={r.id} onClick={() => setExpanded(isOpen ? null : r.id)}
-                    className="border-t border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-bold text-blue-500 shrink-0">
-                          {initials(r.guest.firstName, r.guest.lastName)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-slate-800">{r.guest.firstName} {r.guest.lastName}</div>
-                          <div className="text-[10px] text-slate-400">{r.guest.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs font-mono text-slate-500">{r.confirmationNo}</td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-bold text-slate-900">{r.room.number}</div>
-                      <div className="text-[10px] text-slate-400">{r.room.roomType.name}</div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {fmtDate(r.checkIn)}
-                      {r.eta && <div className="text-[10px] text-slate-400 flex items-center gap-0.5"><Clock size={9} /> {r.eta}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{fmtDate(r.checkOut)} <span className="text-slate-400 text-[10px]">({r.nights}n)</span></td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-bold text-slate-900">{fmt(r.totalAmount)}</div>
-                      {r.balanceDue > 0 ? (
-                        <div className="text-[10px] text-red-500 font-semibold">Due: {fmt(r.balanceDue)}</div>
-                      ) : (
-                        <div className="text-[10px] text-emerald-500 font-semibold">✓ Settled</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm">{sourceCfg.icon}</span>
-                      <span className="text-[10px] text-slate-400 ml-1">{sourceCfg.label}</span>
-                    </td>
-                    <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
-                    <td className="px-4 py-3">
-                      {isOpen ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-300" />}
-                    </td>
-                  </tr>
-
-                  {/* Expanded row */}
-                  {isOpen && (
-                    <tr key={r.id + "-expanded"} className="bg-slate-50/40 border-t border-slate-100">
-                      <td colSpan={9} className="px-6 py-4">
-                        <div className="flex flex-wrap items-center gap-3">
-                          {r.notes && (
-                            <div className="text-xs bg-amber-50 border border-amber-100 text-amber-700 rounded-lg px-3 py-1.5">📝 {r.notes}</div>
-                          )}
-                          {r.adults > 0 && <div className="text-xs text-slate-400 flex items-center gap-1"><Users size={11} /> {r.adults} adult{r.adults > 1 ? "s" : ""}</div>}
-                          {r.checkedInAt && <div className="text-xs text-slate-400">Checked in: {new Date(r.checkedInAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>}
-
-                          <div className="ml-auto flex gap-2 flex-wrap">
-                            {r.status === "CONFIRMED" || r.status === "PENDING" ? (
-                              <button onClick={e => { e.stopPropagation(); setCheckInModal(r); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-semibold">
-                                <LogIn size={12} /> Check In
-                              </button>
-                            ) : null}
-                            {r.status === "CHECKED_IN" ? (
-                              <button onClick={e => { e.stopPropagation(); setCheckOutModal(r); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold">
-                                <LogOut size={12} /> Check Out
-                              </button>
-                            ) : null}
-                            {["CONFIRMED", "PENDING"].includes(r.status) && (
-                              <button onClick={e => { e.stopPropagation(); handleCancel(r.id); }}
-                                className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 bg-white">
-                                Cancel
-                              </button>
-                            )}
-                            <button onClick={e => { e.stopPropagation(); router.push(`/dashboard/folio?reservationId=${r.id}`); }}
-                              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-100 bg-white">
-                              View Folio
-                            </button>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                {[t("guest"), t("confNo"), t("room"), t("checkIn"), t("checkOut"), t("total"), t("source"), t("status"), ""].map(h => (
+                  <th key={h} className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-3">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={9} className="text-center text-slate-300 py-16 text-sm">{t("noReservations")}</td></tr>
+              )}
+              {filtered.map(r => {
+                const isOpen = expanded === r.id;
+                return (
+                  <Fragment key={r.id}>
+                    <tr onClick={() => setExpanded(isOpen ? null : r.id)}
+                      className="border-t border-slate-50 hover:bg-slate-50/50 cursor-pointer transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-bold text-blue-500 shrink-0">
+                            {initials(r.guest.firstName, r.guest.lastName)}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-slate-800">{r.guest.firstName} {r.guest.lastName}</div>
+                            <div className="text-[10px] text-slate-400">{r.guest.email}</div>
                           </div>
                         </div>
                       </td>
+                      <td className="px-4 py-3 text-xs font-mono text-slate-500">{r.confirmationNo}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-bold text-slate-900">{r.room.number}</div>
+                        <div className="text-[10px] text-slate-400">{r.room.roomType.name}</div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        {fmtDate(r.checkIn)}
+                        {r.eta && <div className="text-[10px] text-slate-400 flex items-center gap-0.5"><Clock size={9} /> {r.eta}</div>}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{fmtDate(r.checkOut)} <span className="text-slate-400 text-[10px]">({r.nights}n)</span></td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-bold text-slate-900">{fmt(r.totalAmount)}</div>
+                        {r.balanceDue > 0 ? (
+                          <div className="text-[10px] text-red-500 font-semibold">Due: {fmt(r.balanceDue)}</div>
+                        ) : (
+                          <div className="text-[10px] text-emerald-500 font-semibold">✓ Settled</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm">{SOURCE_ICONS[r.source] ?? "🏨"}</span>
+                        <span className="text-[10px] text-slate-400 ml-1">{sourceLabel(r.source)}</span>
+                      </td>
+                      <td className="px-4 py-3"><StatusBadge status={r.status} label={statusLabel(r.status)} /></td>
+                      <td className="px-4 py-3">
+                        {isOpen ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-300" />}
+                      </td>
                     </tr>
-                  )}
-                </>
-              );
-            })}
-          </tbody>
-        </table>
+
+                    {/* Expanded row */}
+                    {isOpen && (
+                      <tr className="bg-slate-50/40 border-t border-slate-100">
+                        <td colSpan={9} className="px-6 py-4">
+                          <div className="flex flex-wrap items-center gap-3">
+                            {r.notes && (
+                              <div className="text-xs bg-amber-50 border border-amber-100 text-amber-700 rounded-lg px-3 py-1.5">📝 {r.notes}</div>
+                            )}
+                            {r.adults > 0 && <div className="text-xs text-slate-400 flex items-center gap-1"><Users size={11} /> {r.adults} adult{r.adults > 1 ? "s" : ""}</div>}
+                            {r.checkedInAt && <div className="text-xs text-slate-400">{t("checkedIn")}: {fmtDate(r.checkedInAt.split("T")[0])}</div>}
+
+                            <div className="ml-auto flex gap-2 flex-wrap">
+                              {r.status === "CONFIRMED" || r.status === "PENDING" ? (
+                                <button onClick={e => { e.stopPropagation(); setCheckInModal(r); }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-semibold">
+                                  <LogIn size={12} /> {t("checkIn")}
+                                </button>
+                              ) : null}
+                              {r.status === "CHECKED_IN" ? (
+                                <button onClick={e => { e.stopPropagation(); setCheckOutModal(r); }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold">
+                                  <LogOut size={12} /> {t("checkOut")}
+                                </button>
+                              ) : null}
+                              {["CONFIRMED", "PENDING"].includes(r.status) && (
+                                <button onClick={e => { e.stopPropagation(); handleCancel(r.id); }}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 bg-white">
+                                  {tc("cancel")}
+                                </button>
+                              )}
+                              <button onClick={e => { e.stopPropagation(); router.push(`/dashboard/folio?reservationId=${r.id}`); }}
+                                className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-100 bg-white">
+                                {tc("view")} Folio
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Modals */}

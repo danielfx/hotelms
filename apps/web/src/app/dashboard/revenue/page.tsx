@@ -1,16 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { TrendingUp, DollarSign, BarChart3, Zap, Target, ArrowUp, ArrowDown, Brain, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 
 export default function RevenuePage() {
+  const t = useTranslations("revenue");
+  const tc = useTranslations("common");
   const [tab, setTab] = useState<"recommendations" | "forecast" | "rules">("recommendations");
   const [loading, setLoading] = useState(true);
   const [rules, setRules] = useState<any[]>([]);
   const [forecast, setForecast] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
 
-  useEffect(() => {
+  const loadData = () => {
     const now = new Date();
     const from = now.toISOString().split("T")[0];
     const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -28,6 +31,10 @@ export default function RevenuePage() {
       if (recsRes.status === "fulfilled") setRecommendations(Array.isArray(recsRes.value) ? recsRes.value : []);
       setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   if (loading) {
@@ -46,7 +53,7 @@ export default function RevenuePage() {
     return {
       id: r.id,
       name: r.name || "Unnamed Rule",
-      type: r.description || r.adjustmentType || "—",
+      type: r.description || r.adjustmentType || "\u2014",
       adjustment: val >= 0 ? `+${val}${suffix}` : `${val}${suffix}`,
       active: r.isActive ?? r.active ?? r.enabled ?? false,
     };
@@ -55,7 +62,7 @@ export default function RevenuePage() {
   // Map forecast to UI shape
   const mappedForecast = forecast.map((f: any) => {
     const d = f.date ? new Date(f.date) : null;
-    const label = d ? d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" }) : "—";
+    const label = d ? d.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" }) : "\u2014";
     const rawOcc = Number(f.predictedOccupancy ?? f.demand ?? f.occupancyForecast ?? 0);
     // Backend stores occupancy as 0-1 decimal; convert to percentage
     const demand = rawOcc <= 1 ? Math.round(rawOcc * 100) : Math.round(rawOcc);
@@ -82,28 +89,34 @@ export default function RevenuePage() {
       roomType: r.roomTypeCode || r.roomType || r.roomTypeName || "Unknown",
       currentRate,
       recommendedRate,
-      reason: r.reason || r.description || "—",
+      reason: r.reason || r.description || "\u2014",
       confidence,
       impact: r.impact || (diff > 0 ? `+${pctChange}%` : `${pctChange}%`),
     };
   });
 
+  const tabLabels: Record<string, string> = {
+    recommendations: t("recommendations"),
+    forecast: t("forecast"),
+    rules: t("rules"),
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Revenue Intelligence</h1>
-          <p className="text-slate-500 text-sm mt-1">AI-powered pricing and demand forecasting</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
+          <p className="text-slate-500 text-sm mt-1">{t("subtitle")}</p>
         </div>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Pricing Rules", value: String(mappedRules.length), change: `${mappedRules.filter(r => r.active).length} active`, icon: TrendingUp, color: "bg-blue-50 text-blue-600" },
-          { label: "Recommendations", value: String(mappedRecs.length), change: "AI suggestions", icon: DollarSign, color: "bg-green-50 text-green-600" },
-          { label: "Forecast Days", value: String(mappedForecast.length), change: "upcoming", icon: Zap, color: "bg-amber-50 text-amber-600" },
-          { label: "Avg Demand", value: mappedForecast.length > 0 ? `${Math.round(mappedForecast.reduce((s, f) => s + f.demand, 0) / mappedForecast.length)}%` : "—", change: "forecast period", icon: Target, color: "bg-purple-50 text-purple-600" },
+          { label: t("pricingRules"), value: String(mappedRules.length), change: `${mappedRules.filter(r => r.active).length} ${t("active")}`, icon: TrendingUp, color: "bg-blue-50 text-blue-600" },
+          { label: t("recommendations"), value: String(mappedRecs.length), change: t("aiSuggestions"), icon: DollarSign, color: "bg-green-50 text-green-600" },
+          { label: t("forecastDays"), value: String(mappedForecast.length), change: t("upcoming"), icon: Zap, color: "bg-amber-50 text-amber-600" },
+          { label: t("avgDemand"), value: mappedForecast.length > 0 ? `${Math.round(mappedForecast.reduce((s, f) => s + f.demand, 0) / mappedForecast.length)}%` : "\u2014", change: t("forecastPeriod"), icon: Target, color: "bg-purple-50 text-purple-600" },
         ].map(kpi => (
           <div key={kpi.label} className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${kpi.color}`}><kpi.icon size={22} /></div>
@@ -116,9 +129,9 @@ export default function RevenuePage() {
       </div>
 
       <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
-        {(["recommendations", "forecast", "rules"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm rounded-md transition-all ${tab === t ? "bg-white text-slate-900 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+        {(["recommendations", "forecast", "rules"] as const).map(tb => (
+          <button key={tb} onClick={() => setTab(tb)} className={`px-4 py-2 text-sm rounded-md transition-all ${tab === tb ? "bg-white text-slate-900 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
+            {tabLabels[tb]}
           </button>
         ))}
       </div>
@@ -128,12 +141,12 @@ export default function RevenuePage() {
           {mappedRecs.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
               <Brain size={40} className="mx-auto text-slate-300 mb-3" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">No Recommendations Yet</h3>
-              <p className="text-sm text-slate-500">AI recommendations will appear here once enough data is available.</p>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">{t("noRecommendations")}</h3>
+              <p className="text-sm text-slate-500">{t("noRecommendationsDesc")}</p>
             </div>
           ) : mappedRecs.map(r => (
             <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-5">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center"><Brain size={20} className="text-blue-600" /></div>
                   <div>
@@ -141,9 +154,9 @@ export default function RevenuePage() {
                     <p className="text-sm text-slate-500">{r.reason}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-wrap items-center gap-6">
                   <div className="text-right">
-                    <div className="text-sm text-slate-500">Current</div>
+                    <div className="text-sm text-slate-500">{t("current")}</div>
                     <div className="font-bold text-slate-900">${r.currentRate}</div>
                   </div>
                   {r.recommendedRate !== r.currentRate && (
@@ -152,21 +165,29 @@ export default function RevenuePage() {
                         {r.recommendedRate > r.currentRate ? <ArrowUp size={20} /> : <ArrowDown size={20} />}
                       </div>
                       <div className="text-right">
-                        <div className="text-sm text-slate-500">Recommended</div>
+                        <div className="text-sm text-slate-500">{t("recommended")}</div>
                         <div className={`font-bold ${r.recommendedRate > r.currentRate ? "text-green-600" : "text-amber-600"}`}>${r.recommendedRate}</div>
                       </div>
                     </>
                   )}
                   <div className="text-right">
-                    <div className="text-sm text-slate-500">Impact</div>
+                    <div className="text-sm text-slate-500">{t("impact")}</div>
                     <div className="font-medium text-blue-600">{r.impact}</div>
                   </div>
                   <div className="text-right min-w-[60px]">
-                    <div className="text-sm text-slate-500">Confidence</div>
+                    <div className="text-sm text-slate-500">{t("confidence")}</div>
                     <div className="font-bold text-slate-900">{r.confidence}%</div>
                   </div>
                   {r.recommendedRate !== r.currentRate && (
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Apply</button>
+                    <button
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                      onClick={async () => {
+                        try {
+                          await api.revenue.applyRecommendation(r.id);
+                          loadData();
+                        } catch (e: any) { alert(e.message || "Failed to apply recommendation"); }
+                      }}
+                    >{t("applyRec")}</button>
                   )}
                 </div>
               </div>
@@ -177,21 +198,21 @@ export default function RevenuePage() {
 
       {tab === "forecast" && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h3 className="font-semibold text-slate-900 mb-4">Demand Forecast</h3>
+          <h3 className="font-semibold text-slate-900 mb-4">{t("demandForecast")}</h3>
           {mappedForecast.length === 0 ? (
             <div className="py-12 text-center">
               <BarChart3 size={40} className="mx-auto text-slate-300 mb-3" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">No Forecast Data</h3>
-              <p className="text-sm text-slate-500">Demand forecasts will appear here once sufficient booking data is available.</p>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">{t("noForecastData")}</h3>
+              <p className="text-sm text-slate-500">{t("noForecastDesc")}</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 overflow-x-auto">
               {mappedForecast.map(d => (
-                <div key={d.date} className="flex items-center gap-4 py-2 border-b border-slate-50 last:border-0">
+                <div key={d.date} className="flex items-center gap-4 py-2 border-b border-slate-50 last:border-0 min-w-[500px]">
                   <span className="text-sm text-slate-600 w-20">{d.date}</span>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-slate-500 w-16">Demand</span>
+                      <span className="text-xs text-slate-500 w-16">{t("demand")}</span>
                       <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${d.demand >= 90 ? "bg-red-400" : d.demand >= 70 ? "bg-amber-400" : "bg-blue-400"}`} style={{ width: `${Math.min(d.demand, 100)}%` }} />
                       </div>
@@ -218,34 +239,44 @@ export default function RevenuePage() {
           {mappedRules.length === 0 ? (
             <div className="py-12 text-center">
               <Zap size={40} className="mx-auto text-slate-300 mb-3" />
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">No Pricing Rules</h3>
-              <p className="text-sm text-slate-500">Create pricing rules to automate rate adjustments based on demand and occupancy.</p>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">{t("noPricingRules")}</h3>
+              <p className="text-sm text-slate-500">{t("noPricingRulesDesc")}</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-sm text-slate-500 border-b border-slate-100">
-                  <th className="p-4 font-medium">Rule Name</th>
-                  <th className="p-4 font-medium">Condition</th>
-                  <th className="p-4 font-medium">Adjustment</th>
-                  <th className="p-4 font-medium text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mappedRules.map(rule => (
-                  <tr key={rule.id} className="border-b border-slate-50 hover:bg-slate-50">
-                    <td className="p-4 font-medium text-slate-900">{rule.name}</td>
-                    <td className="p-4 text-sm text-slate-600">{rule.type}</td>
-                    <td className="p-4"><span className={`px-2 py-0.5 rounded text-sm font-medium ${rule.adjustment.startsWith("+") ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>{rule.adjustment}</span></td>
-                    <td className="p-4 text-center">
-                      <button className={`w-10 h-6 rounded-full transition-colors ${rule.active ? "bg-blue-600" : "bg-slate-200"}`}>
-                        <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${rule.active ? "translate-x-5" : "translate-x-1"}`} />
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-sm text-slate-500 border-b border-slate-100">
+                    <th className="p-4 font-medium">{t("ruleName")}</th>
+                    <th className="p-4 font-medium">{t("condition")}</th>
+                    <th className="p-4 font-medium">{t("adjustment")}</th>
+                    <th className="p-4 font-medium text-center">{tc("status")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {mappedRules.map(rule => (
+                    <tr key={rule.id} className="border-b border-slate-50 hover:bg-slate-50">
+                      <td className="p-4 font-medium text-slate-900">{rule.name}</td>
+                      <td className="p-4 text-sm text-slate-600">{rule.type}</td>
+                      <td className="p-4"><span className={`px-2 py-0.5 rounded text-sm font-medium ${rule.adjustment.startsWith("+") ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>{rule.adjustment}</span></td>
+                      <td className="p-4 text-center">
+                        <button
+                          className={`w-10 h-6 rounded-full transition-colors ${rule.active ? "bg-blue-600" : "bg-slate-200"}`}
+                          onClick={async () => {
+                            try {
+                              await api.revenue.updateRule(rule.id, { isActive: !rule.active });
+                              loadData();
+                            } catch (e: any) { alert(e.message || "Failed to toggle rule"); }
+                          }}
+                        >
+                          <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${rule.active ? "translate-x-5" : "translate-x-1"}`} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

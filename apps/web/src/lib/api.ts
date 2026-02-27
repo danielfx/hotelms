@@ -120,7 +120,7 @@ class ApiClient {
     create: (data: any) => this.post<any>("/reservations", data),
     update: (id: string, data: any) => this.patch<any>(`/reservations/${id}`, data),
     checkIn: (id: string, data?: any) => this.post<any>(`/reservations/${id}/checkin`, data),
-    checkOut: (id: string) => this.post<any>(`/reservations/${id}/checkout`),
+    checkOut: (id: string, data?: any) => this.post<any>(`/reservations/${id}/checkout`, data),
     cancel: (id: string, reason?: string) => this.post<any>(`/reservations/${id}/cancel`, { reason }),
     noShow: (id: string) => this.post<any>(`/reservations/${id}/no-show`),
   };
@@ -134,6 +134,7 @@ class ApiClient {
     get: (id: string) => this.get<any>(`/guests/${id}`),
     create: (data: any) => this.post<any>("/guests", data),
     update: (id: string, data: any) => this.patch<any>(`/guests/${id}`, data),
+    toggleVip: (id: string) => this.patch<any>(`/guests/${id}/vip`),
     search: (q: string) => this.get<any[]>(`/guests/search?q=${encodeURIComponent(q)}`),
   };
 
@@ -155,6 +156,12 @@ class ApiClient {
     create: (data: any) => this.post<any>("/rates/plans", data),
     update: (id: string, data: any) => this.patch<any>(`/rates/plans/${id}`, data),
     bulkUpdate: (data: any) => this.post<any>("/rates/bulk-update", data),
+    duplicate: (id: string, data: { code: string; name: string }) => this.post<any>(`/rates/plans/${id}/duplicate`, data),
+    dailyRates: (planId: string, params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any>(`/rates/plans/${planId}/daily${q}`);
+    },
+    setDailyRate: (planId: string, data: any) => this.post<any>(`/rates/plans/${planId}/daily`, data),
   };
 
   // ─── HOUSEKEEPING ──────────────────────────────────────────────────────────
@@ -163,6 +170,7 @@ class ApiClient {
       const q = params ? "?" + new URLSearchParams(params).toString() : "";
       return this.get<any>(`/housekeeping/tasks${q}`);
     },
+    createTask: (data: any) => this.post<any>("/housekeeping/tasks", data),
     update: (id: string, data: any) => this.patch<any>(`/housekeeping/tasks/${id}`, data),
     assign: (id: string, attendantId: string) => this.post<any>(`/housekeeping/tasks/${id}/assign`, { attendantId }),
     start: (id: string) => this.post<any>(`/housekeeping/tasks/${id}/start`),
@@ -171,6 +179,12 @@ class ApiClient {
     generate: (date?: string) => this.post<any>("/housekeeping/schedule/generate", { date }),
     attendants: () => this.get<any[]>("/housekeeping/attendants"),
     stats: () => this.get<any>("/housekeeping/stats"),
+    maintenance: (params?: Record<string, string>) => {
+      const q = params ? "?" + new URLSearchParams(params).toString() : "";
+      return this.get<any>(`/housekeeping/maintenance${q}`);
+    },
+    createMaintenance: (data: any) => this.post<any>("/housekeeping/maintenance", data),
+    resolveMaintenance: (id: string, data: any) => this.post<any>(`/housekeeping/maintenance/${id}/resolve`, data),
   };
 
   // ─── REPORTS ───────────────────────────────────────────────────────────────
@@ -195,11 +209,11 @@ class ApiClient {
     list: () => this.get<any[]>("/channels"),
     get: (id: string) => this.get<any>(`/channels/${id}`),
     connect: (channel: string, credentials: any) => this.post<any>("/channels/connect", { channel, ...credentials }),
-    sync: (id: string, type?: string) => {
-      if (type === "rates") return this.post<any>(`/channels/${id}/sync/rates`, {});
-      if (type === "inventory") return this.post<any>(`/channels/${id}/sync/inventory`, {});
-      // Default: sync both by calling sync-all or rates
-      return this.post<any>(`/channels/${id}/sync/rates`, {});
+    sync: (id: string, type?: string, dateRange?: { dateFrom: string; dateTo: string }) => {
+      const body = dateRange ?? {};
+      if (type === "rates") return this.post<any>(`/channels/${id}/sync/rates`, body);
+      if (type === "inventory") return this.post<any>(`/channels/${id}/sync/inventory`, body);
+      return this.post<any>(`/channels/${id}/sync/rates`, body);
     },
     syncAll: () => this.post<any>("/channels/sync-all"),
     pullReservations: (id: string) => this.post<any>(`/channels/${id}/pull/reservations`),
@@ -305,8 +319,10 @@ class ApiClient {
     webhookDeliveries: (id: string) => this.get<any[]>(`/marketplace/webhooks/${id}/deliveries`),
     testWebhook: (id: string) => this.post<any>(`/marketplace/webhooks/${id}/test`),
     listIntegrations: () => this.get<any[]>("/marketplace/integrations"),
+    catalog: () => this.get<any[]>("/marketplace/catalog"),
     installIntegration: (slug: string, config?: any) => this.post<any>(`/marketplace/integrations/${slug}/install`, { config }),
     uninstallIntegration: (slug: string) => this.post<any>(`/marketplace/integrations/${slug}/uninstall`),
+    toggleIntegration: (id: string, enabled: boolean) => this.patch<any>(`/marketplace/integrations/${id}/toggle`, { enabled }),
   };
 
   // ─── AUDIT ────────────────────────────────────────────────────────────────

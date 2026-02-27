@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Sora } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 
 const sora = Sora({
@@ -13,10 +15,17 @@ export const metadata: Metadata = {
   description: "Modern hotel management platform",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="en">
-      <body className={`${sora.variable} font-sans antialiased`}>{children}</body>
+    <html lang={locale}>
+      <body className={`${sora.variable} font-sans antialiased`}>
+        <NextIntlClientProvider messages={messages}>
+          {children}
+        </NextIntlClientProvider>
+      </body>
     </html>
   );
 }

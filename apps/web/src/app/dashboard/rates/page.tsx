@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Plus, Copy, ChevronLeft, ChevronRight, X, Check, AlertCircle, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
 
@@ -34,25 +35,25 @@ const ROOM_TYPES = [
   { code: "STE", name: "Suite",     basePrice: 289 },
 ];
 
-const TYPE_CFG: Record<PlanType, { label: string; color: string }> = {
-  PUBLIC:    { label: "Public",    color: "#3B82F6" },
-  MEMBER:    { label: "Member",    color: "#8B5CF6" },
-  CORPORATE: { label: "Corporate", color: "#0F766E" },
-  OTA:       { label: "OTA",       color: "#D97706" },
-  PACKAGE:   { label: "Package",   color: "#059669" },
-  PROMO:     { label: "Promo",     color: "#E11D48" },
+const TYPE_COLORS: Record<PlanType, string> = {
+  PUBLIC: "#3B82F6", MEMBER: "#8B5CF6", CORPORATE: "#0F766E",
+  OTA: "#D97706", PACKAGE: "#059669", PROMO: "#E11D48",
+};
+const TYPE_KEYS: Record<PlanType, string> = {
+  PUBLIC: "public", MEMBER: "member", CORPORATE: "corporate",
+  OTA: "ota", PACKAGE: "package", PROMO: "promo",
 };
 
-const CANCEL_CFG: Record<CancelPolicy, { label: string; color: string }> = {
-  FREE:            { label: "Free Cancel",     color: "#10B981" },
-  MODERATE:        { label: "48h Notice",      color: "#3B82F6" },
-  STRICT:          { label: "Strict",          color: "#F59E0B" },
-  NON_REFUNDABLE:  { label: "Non-Refundable",  color: "#EF4444" },
+const CANCEL_COLORS: Record<CancelPolicy, string> = {
+  FREE: "#10B981", MODERATE: "#3B82F6", STRICT: "#F59E0B", NON_REFUNDABLE: "#EF4444",
+};
+const CANCEL_KEYS: Record<CancelPolicy, string> = {
+  FREE: "freeCancel", MODERATE: "moderate", STRICT: "strict", NON_REFUNDABLE: "nonRefundable",
 };
 
-const MEAL_LABELS: Record<MealPlan, string> = {
-  ROOM_ONLY: "Room Only", BED_BREAKFAST: "B&B",
-  HALF_BOARD: "Half Board", FULL_BOARD: "Full Board", ALL_INCLUSIVE: "All Inclusive",
+const MEAL_KEYS: Record<MealPlan, string> = {
+  ROOM_ONLY: "roomOnly", BED_BREAKFAST: "bedAndBreakfast",
+  HALF_BOARD: "halfBoard", FULL_BOARD: "fullBoard", ALL_INCLUSIVE: "allInclusive",
 };
 
 const fmt = (n: number) => `$${n.toFixed(0)}`;
@@ -76,10 +77,20 @@ function mapRatePlan(raw: any): RatePlan {
   };
 }
 
+// ─── Simple deterministic hash for availability ─────────────────────────────
+function seedAvail(planId: string, rtCode: string, dayIndex: number, isWeekend: boolean): number {
+  let h = 0;
+  const s = planId + rtCode + dayIndex;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+  const v = Math.abs(h) % 10;
+  return isWeekend ? (v % 3) + 1 : (v % 8) + 3;
+}
+
 // ─── Generate grid from plans ────────────────────────────────────────────────
+// Fallback: generates initial grid data. Real rates are persisted per-cell via setDailyRate.
 function generateGrid(plans: RatePlan[]): RateGrid {
   const grid: RateGrid = {};
-  const today = new Date();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
 
   for (const plan of plans) {
     grid[plan.id] = {};
@@ -87,7 +98,7 @@ function generateGrid(plans: RatePlan[]): RateGrid {
       grid[plan.id][rt.code] = {};
       for (let i = 0; i < 30; i++) {
         const d = new Date(today); d.setDate(today.getDate() + i);
-        const dateStr = d.toISOString().split("T")[0];
+        const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
         const dow = d.getDay();
         const isWeekend = dow === 5 || dow === 6;
 
@@ -100,7 +111,7 @@ function generateGrid(plans: RatePlan[]): RateGrid {
 
         grid[plan.id][rt.code][dateStr] = {
           price,
-          available: isWeekend ? Math.floor(Math.random() * 3) + 1 : Math.floor(Math.random() * 8) + 3,
+          available: seedAvail(plan.id, rt.code, i, isWeekend),
           closed: false,
           closedToArrival: false,
           closedToDeparture: false,
@@ -114,8 +125,12 @@ function generateGrid(plans: RatePlan[]): RateGrid {
 // ─── COMPONENTS ──────────────────────────────────────────────────────────────
 
 function PlanCard({ plan, selected, onClick }: { plan: RatePlan; selected: boolean; onClick: () => void }) {
-  const tc = TYPE_CFG[plan.type] ?? TYPE_CFG.PUBLIC;
-  const cc = CANCEL_CFG[plan.cancellationPolicy] ?? CANCEL_CFG.MODERATE;
+  const t = useTranslations("rates");
+  const typeColor = TYPE_COLORS[plan.type] ?? TYPE_COLORS.PUBLIC;
+  const typeLabel = t(TYPE_KEYS[plan.type] ?? "public");
+  const cancelColor = CANCEL_COLORS[plan.cancellationPolicy] ?? CANCEL_COLORS.MODERATE;
+  const cancelLabel = t(CANCEL_KEYS[plan.cancellationPolicy] ?? "moderate");
+  const mealLabel = t(MEAL_KEYS[plan.mealPlan] ?? "roomOnly");
 
   return (
     <button onClick={onClick}
@@ -125,13 +140,13 @@ function PlanCard({ plan, selected, onClick }: { plan: RatePlan; selected: boole
           <div className="font-bold text-slate-900 text-sm">{plan.name}</div>
           <div className="text-[10px] font-mono text-slate-400 mt-0.5">{plan.code}</div>
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: tc.color + "15", color: tc.color }}>
-          {tc.label}
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: typeColor + "15", color: typeColor }}>
+          {typeLabel}
         </span>
       </div>
       <div className="flex flex-wrap gap-1.5 mt-2">
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{MEAL_LABELS[plan.mealPlan] ?? plan.mealPlan}</span>
-        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: cc.color + "12", color: cc.color }}>{cc.label}</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{mealLabel}</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: cancelColor + "12", color: cancelColor }}>{cancelLabel}</span>
         {plan.discount > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-bold">-{plan.discount}%</span>}
         {plan.markup > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-bold">+{plan.markup}%</span>}
         {plan.minLOS > 1 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-50 text-violet-600">Min {plan.minLOS}n</span>}
@@ -149,6 +164,7 @@ function RateCell({
   onSave: (price: number, available: number) => void;
   onEdit: () => void;
 }) {
+  const t = useTranslations("rates");
   const [editPrice, setEditPrice] = useState(rate?.price ?? basePrice);
   const [editAvail, setEditAvail] = useState(rate?.available ?? 10);
 
@@ -165,7 +181,7 @@ function RateCell({
   if (rate.closed) {
     return (
       <td className="border border-slate-100 p-0 bg-slate-100">
-        <div className="min-w-[72px] py-2 text-center text-[10px] text-slate-400 font-bold">CLOSED</div>
+        <div className="min-w-[72px] py-2 text-center text-[10px] text-slate-400 font-bold">{t("closed")}</div>
       </td>
     );
   }
@@ -200,7 +216,7 @@ function RateCell({
         <div className="text-xs font-bold text-slate-900">{fmt(rate.price)}</div>
         <div className="flex items-center justify-between">
           <span className="text-[9px] font-semibold" style={{ color: availColor }}>
-            {rate.available} avail
+            {rate.available} {t("avail")}
           </span>
           {priceDiff !== 0 && (
             <span className={`text-[9px] font-bold ${isHigh ? "text-emerald-600" : "text-red-500"}`}>
@@ -222,6 +238,8 @@ function RateCell({
 // ─── MAIN PAGE ───────────────────────────────────────────────────────────────
 
 export default function RatesPage() {
+  const t = useTranslations("rates");
+  const tc = useTranslations("common");
   const [plans, setPlans] = useState<RatePlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<RatePlan | null>(null);
   const [grid, setGrid] = useState<RateGrid>({});
@@ -232,6 +250,10 @@ export default function RatesPage() {
   const [bulkForm, setBulkForm] = useState({ roomTypeCode: "DLX", price: 0, dateFrom: "", dateTo: "", daysOfWeek: [] as number[] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [newPlanForm, setNewPlanForm] = useState({ name: "", code: "", type: "PUBLIC", discount: 0 });
+  const [saving, setSaving] = useState(false);
+  const [showClone, setShowClone] = useState(false);
+  const [cloneForm, setCloneForm] = useState({ name: "", code: "" });
 
   useEffect(() => {
     setLoading(true);
@@ -251,17 +273,19 @@ export default function RatesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Base date computed once on mount to avoid hydration mismatch
+  const [baseDate] = useState(() => { const d = new Date(); d.setHours(0,0,0,0); return d; });
+
   // Compute visible dates (14 days from today + weekOffset*7)
   const dates = useMemo(() => {
-    const today = new Date(); today.setHours(0,0,0,0);
     return Array.from({ length: 14 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(today.getDate() + weekOffset * 7 + i);
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + weekOffset * 7 + i);
       return d;
     });
-  }, [weekOffset]);
+  }, [weekOffset, baseDate]);
 
-  const handleSaveRate = (roomTypeCode: string, dateStr: string, price: number, available: number) => {
+  const handleSaveRate = async (roomTypeCode: string, dateStr: string, price: number, available: number) => {
     if (!selectedPlan) return;
     setGrid(g => ({
       ...g,
@@ -278,9 +302,12 @@ export default function RatesPage() {
       },
     }));
     setEditingCell(null);
+    try {
+      await api.rates.setDailyRate(selectedPlan.id, { roomTypeCode, date: dateStr, price, available });
+    } catch (e: any) { console.error("Failed to save rate:", e); }
   };
 
-  const handleBulkUpdate = () => {
+  const handleBulkUpdate = async () => {
     if (!selectedPlan || !bulkForm.price || !bulkForm.dateFrom || !bulkForm.dateTo) return;
     const from = new Date(bulkForm.dateFrom);
     const to = new Date(bulkForm.dateTo);
@@ -305,6 +332,16 @@ export default function RatesPage() {
       },
     }));
     setShowBulkUpdate(false);
+    try {
+      await api.rates.bulkUpdate({
+        ratePlanId: selectedPlan.id,
+        roomTypeCode: bulkForm.roomTypeCode,
+        dateFrom: bulkForm.dateFrom,
+        dateTo: bulkForm.dateTo,
+        price: bulkForm.price,
+        daysOfWeek: bulkForm.daysOfWeek.length > 0 ? bulkForm.daysOfWeek : undefined,
+      });
+    } catch (e: any) { alert(e.message || "Failed to save bulk rates"); }
   };
 
   const toggleDow = (d: number) => {
@@ -316,6 +353,24 @@ export default function RatesPage() {
 
   const DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
 
+  const handleCreatePlan = async () => {
+    if (!newPlanForm.name || !newPlanForm.code) return;
+    setSaving(true);
+    try {
+      await api.rates.create({ name: newPlanForm.name, code: newPlanForm.code, type: newPlanForm.type, discount: newPlanForm.discount });
+      setShowNewPlan(false);
+      setNewPlanForm({ name: "", code: "", type: "PUBLIC", discount: 0 });
+      // reload plans
+      const data = await api.rates.list();
+      const list = Array.isArray(data) ? data : (data as any).rates ?? (data as any).data ?? [];
+      const mapped = list.map(mapRatePlan);
+      setPlans(mapped);
+      if (mapped.length > 0) setSelectedPlan(mapped[0]);
+      setGrid(generateGrid(mapped));
+    } catch (e: any) { alert(e.message || "Failed to create rate plan"); }
+    finally { setSaving(false); }
+  };
+
   if (loading) {
     return (
       <div className="space-y-5">
@@ -324,7 +379,7 @@ export default function RatesPage() {
             <div className="h-4 bg-slate-200 rounded w-1/3 mx-auto"></div>
             <div className="h-8 bg-slate-200 rounded w-1/2 mx-auto"></div>
           </div>
-          <p className="text-sm text-slate-400 mt-4">Loading rate plans...</p>
+          <p className="text-sm text-slate-400 mt-4">{t("loadingRates")}</p>
         </div>
       </div>
     );
@@ -346,10 +401,10 @@ export default function RatesPage() {
       <div className="space-y-5">
         <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center">
           <TrendingUp size={32} className="mx-auto text-slate-300 mb-2" />
-          <h3 className="font-bold text-slate-700 text-lg">No Rate Plans</h3>
-          <p className="text-sm text-slate-400 mt-1">Create your first rate plan to get started.</p>
+          <h3 className="font-bold text-slate-700 text-lg">{t("noRatePlans")}</h3>
+          <p className="text-sm text-slate-400 mt-1">{t("createFirstPlan")}</p>
           <button onClick={() => setShowNewPlan(true)} className="btn-primary text-sm mt-4">
-            <Plus size={14} /> New Rate Plan
+            <Plus size={14} /> {t("newPlan")}
           </button>
         </div>
       </div>
@@ -358,15 +413,33 @@ export default function RatesPage() {
 
   const activePlan = selectedPlan ?? plans[0];
 
+  const handleClonePlan = async () => {
+    if (!cloneForm.name || !cloneForm.code) return;
+    setSaving(true);
+    try {
+      await api.rates.duplicate(activePlan.id, { name: cloneForm.name, code: cloneForm.code });
+      setShowClone(false);
+      setCloneForm({ name: "", code: "" });
+      // reload plans
+      const data = await api.rates.list();
+      const list = Array.isArray(data) ? data : (data as any).rates ?? (data as any).data ?? [];
+      const mapped = list.map(mapRatePlan);
+      setPlans(mapped);
+      if (mapped.length > 0) setSelectedPlan(mapped[0]);
+      setGrid(generateGrid(mapped));
+    } catch (e: any) { alert(e.message || "Failed to clone rate plan"); }
+    finally { setSaving(false); }
+  };
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
         {/* Plans sidebar */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 text-sm">Rate Plans</h3>
+            <h3 className="font-bold text-slate-800 text-sm">{t("title")}</h3>
             <button onClick={() => setShowNewPlan(true)} className="btn-primary text-xs py-1.5 flex items-center gap-1">
-              <Plus size={12} /> New
+              <Plus size={12} /> {tc("new")}
             </button>
           </div>
           <div className="space-y-2">
@@ -383,17 +456,17 @@ export default function RatesPage() {
               <h3 className="font-bold text-slate-900">{activePlan.name}</h3>
               <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-3">
                 <span className="font-mono">{activePlan.code}</span>
-                <span>{MEAL_LABELS[activePlan.mealPlan] ?? activePlan.mealPlan}</span>
-                {activePlan.discount > 0 && <span className="text-red-500 font-semibold">-{activePlan.discount}% discount</span>}
-                {activePlan.markup > 0 && <span className="text-emerald-500 font-semibold">+{activePlan.markup}% markup</span>}
+                <span>{t(MEAL_KEYS[activePlan.mealPlan] ?? "roomOnly")}</span>
+                {activePlan.discount > 0 && <span className="text-red-500 font-semibold">-{activePlan.discount}% {t("discount")}</span>}
+                {activePlan.markup > 0 && <span className="text-emerald-500 font-semibold">+{activePlan.markup}% {t("markup")}</span>}
               </div>
             </div>
             <div className="flex gap-2">
               <button onClick={() => setShowBulkUpdate(true)} className="btn-ghost text-xs flex items-center gap-1.5">
-                <TrendingUp size={12} /> Bulk Update
+                <TrendingUp size={12} /> {t("bulkUpdate")}
               </button>
-              <button className="btn-ghost text-xs flex items-center gap-1.5">
-                <Copy size={12} /> Clone Plan
+              <button onClick={() => { setCloneForm({ name: activePlan.name + " (Copy)", code: activePlan.code + "-COPY" }); setShowClone(true); }} className="btn-ghost text-xs flex items-center gap-1.5">
+                <Copy size={12} /> {t("clonePlan")}
               </button>
               <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
                 <button onClick={() => setWeekOffset(w => w - 1)} className="p-1.5 rounded-lg hover:bg-white hover:shadow-sm transition-all">
@@ -407,7 +480,7 @@ export default function RatesPage() {
                   <ChevronRight size={13} className="text-slate-600" />
                 </button>
                 {weekOffset !== 0 && (
-                  <button onClick={() => setWeekOffset(0)} className="text-[10px] text-blue-500 font-semibold px-2 hover:underline">Today</button>
+                  <button onClick={() => setWeekOffset(0)} className="text-[10px] text-blue-500 font-semibold px-2 hover:underline">{t("today")}</button>
                 )}
               </div>
             </div>
@@ -420,10 +493,10 @@ export default function RatesPage() {
                 <thead>
                   <tr className="bg-slate-50">
                     <th className="text-left text-xs font-bold text-slate-400 px-4 py-2.5 border-r border-slate-100 sticky left-0 bg-slate-50 min-w-[110px]">
-                      Room Type
+                      {t("roomType")}
                     </th>
                     {dates.map(d => {
-                      const isToday = d.toDateString() === new Date().toDateString();
+                      const isToday = d.toDateString() === baseDate.toDateString();
                       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                       return (
                         <th key={d.toISOString()} className={`text-center px-1 py-2 border-l border-slate-100 min-w-[72px] ${isWeekend ? "bg-slate-100/70" : ""}`}>
@@ -444,10 +517,10 @@ export default function RatesPage() {
                     <tr key={rt.code}>
                       <td className="border-r border-slate-100 px-4 py-2 sticky left-0 bg-white">
                         <div className="text-xs font-bold text-slate-900">{rt.name}</div>
-                        <div className="text-[10px] text-slate-400">Base: {fmt(rt.basePrice)}</div>
+                        <div className="text-[10px] text-slate-400">{t("base")}: {fmt(rt.basePrice)}</div>
                       </td>
                       {dates.map(d => {
-                        const dateStr = d.toISOString().split("T")[0];
+                        const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
                         const rate = grid[activePlan.id]?.[rt.code]?.[dateStr];
                         const isEditing = editingCell?.roomType === rt.code && editingCell?.date === dateStr;
                         return (
@@ -470,11 +543,11 @@ export default function RatesPage() {
 
           {/* Legend */}
           <div className="flex flex-wrap gap-4 text-[10px] text-slate-400">
-            <span>Click any cell to edit price and availability</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Good availability</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Low (≤2)</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Sold out</span>
-            <span>CTA = Closed to Arrival · CTD = Closed to Departure</span>
+            <span>{t("clickToEdit")}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" /> {t("goodAvail")}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> {t("lowAvail")}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> {t("soldOut")}</span>
+            <span>{t("ctaCtd")}</span>
           </div>
         </div>
       </div>
@@ -484,38 +557,38 @@ export default function RatesPage() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-900">Bulk Update Rates</h3>
+              <h3 className="font-bold text-slate-900">{t("bulkUpdateRates")}</h3>
               <button onClick={() => setShowBulkUpdate(false)}><X size={14} className="text-slate-400" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">Room Type</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{t("roomType")}</label>
                   <select value={bulkForm.roomTypeCode} onChange={e => setBulkForm(f => ({ ...f, roomTypeCode: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
                     {ROOM_TYPES.map(rt => <option key={rt.code} value={rt.code}>{rt.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">New Price *</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{t("newPrice")} *</label>
                   <input type="number" min={0} value={bulkForm.price || ""} onChange={e => setBulkForm(f => ({ ...f, price: Number(e.target.value) }))}
                     placeholder="$0.00"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">From *</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{t("from")} *</label>
                   <input type="date" value={bulkForm.dateFrom} onChange={e => setBulkForm(f => ({ ...f, dateFrom: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">To *</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{t("to")} *</label>
                   <input type="date" value={bulkForm.dateTo} onChange={e => setBulkForm(f => ({ ...f, dateTo: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-2">Apply to days (leave empty = all days)</label>
+                <label className="text-xs font-semibold text-slate-500 block mb-2">{t("applyToDays")}</label>
                 <div className="flex gap-1.5">
                   {DAYS.map((day, i) => (
                     <button key={day} onClick={() => toggleDow(i)}
@@ -536,49 +609,89 @@ export default function RatesPage() {
               )}
 
               <div className="flex gap-3">
-                <button onClick={() => setShowBulkUpdate(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button onClick={handleBulkUpdate} className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold">Apply Rates</button>
+                <button onClick={() => setShowBulkUpdate(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">{tc("cancel")}</button>
+                <button onClick={handleBulkUpdate} className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold">{t("applyRates")}</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* New Rate Plan Modal (simplified) */}
+      {/* New Rate Plan Modal */}
       {showNewPlan && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-900">New Rate Plan</h3>
+              <h3 className="font-bold text-slate-900">{t("newRatePlan")}</h3>
               <button onClick={() => setShowNewPlan(false)}><X size={14} className="text-slate-400" /></button>
             </div>
             <div className="p-6 space-y-3">
-              {[
-                { label: "Plan Name *", key: "name", placeholder: "e.g. Summer Special" },
-                { label: "Code *", key: "code", placeholder: "e.g. SUM25" },
-              ].map(({ label, key, placeholder }) => (
-                <div key={key}>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">{label}</label>
-                  <input placeholder={placeholder}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
-                </div>
-              ))}
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">{t("planName")} *</label>
+                <input placeholder="e.g. Summer Special" value={newPlanForm.name}
+                  onChange={e => setNewPlanForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">{t("planCode")} *</label>
+                <input placeholder="e.g. SUM25" value={newPlanForm.code}
+                  onChange={e => setNewPlanForm(f => ({ ...f, code: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">Type</label>
-                  <select className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
-                    {Object.entries(TYPE_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("type")}</label>
+                  <select value={newPlanForm.type} onChange={e => setNewPlanForm(f => ({ ...f, type: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
+                    {Object.entries(TYPE_KEYS).map(([k, key]) => <option key={k} value={k}>{t(key)}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">Discount %</label>
-                  <input type="number" min={0} max={100} placeholder="0"
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{t("discountPct")}</label>
+                  <input type="number" min={0} max={100} placeholder="0" value={newPlanForm.discount || ""}
+                    onChange={e => setNewPlanForm(f => ({ ...f, discount: Number(e.target.value) }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowNewPlan(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button onClick={() => setShowNewPlan(false)} className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold">Create Plan</button>
+                <button onClick={() => setShowNewPlan(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">{tc("cancel")}</button>
+                <button onClick={handleCreatePlan} disabled={saving || !newPlanForm.name || !newPlanForm.code}
+                  className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-semibold">
+                  {saving ? tc("creating") : t("createPlan")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clone Plan Modal */}
+      {showClone && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-bold text-slate-900">{t("cloneRatePlan")}</h3>
+              <button onClick={() => setShowClone(false)}><X size={14} className="text-slate-400" /></button>
+            </div>
+            <div className="p-6 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">{t("newPlanName")} *</label>
+                <input placeholder="e.g. Summer Special (Copy)" value={cloneForm.name}
+                  onChange={e => setCloneForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">{t("newCode")} *</label>
+                <input placeholder="e.g. SUM25-COPY" value={cloneForm.code}
+                  onChange={e => setCloneForm(f => ({ ...f, code: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowClone(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">{tc("cancel")}</button>
+                <button onClick={handleClonePlan} disabled={saving || !cloneForm.name || !cloneForm.code}
+                  className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-semibold">
+                  {saving ? t("cloning") : t("clonePlan")}
+                </button>
               </div>
             </div>
           </div>

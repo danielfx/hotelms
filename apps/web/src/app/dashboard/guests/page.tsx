@@ -1,7 +1,72 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Plus, Star, AlertTriangle, Users, TrendingUp, UserCheck, Calendar } from "lucide-react";
+import { useTranslations } from "next-intl";
 import api from "@/lib/api";
+
+function AddGuestModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const t = useTranslations("guests");
+  const tc = useTranslations("common");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [nationality, setNationality] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.guests.create({ firstName, lastName, email, phone, nationality });
+      onSaved();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <form onClick={e => e.stopPropagation()} onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <h2 className="text-lg font-bold text-slate-900">{t("addGuest")}</h2>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">{t("firstName")}</label>
+          <input value={firstName} onChange={e => setFirstName(e.target.value)} required
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">{t("lastName")}</label>
+          <input value={lastName} onChange={e => setLastName(e.target.value)} required
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">{t("email")}</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">{t("phone")}</label>
+          <input value={phone} onChange={e => setPhone(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">{t("nationality")}</label>
+          <input value={nationality} onChange={e => setNationality(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="btn-ghost text-xs py-2 px-4">{tc("cancel")}</button>
+          <button type="submit" disabled={saving} className="btn-primary text-xs py-2 px-4 disabled:opacity-50">
+            {saving ? tc("saving") : t("addGuest")}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 const FLAG: Record<string, string> = { US: "🇺🇸", ES: "🇪🇸", CN: "🇨🇳", DE: "🇩🇪", MX: "🇲🇽", GB: "🇬🇧", AE: "🇦🇪", JP: "🇯🇵", IT: "🇮🇹", KR: "🇰🇷" };
 const initials = (f: string, l: string) => ((f?.[0] ?? "") + (l?.[0] ?? "")).toUpperCase();
@@ -40,6 +105,9 @@ function normalizeGuest(g: any): Guest {
 }
 
 export default function GuestsPage() {
+  const t = useTranslations("guests");
+  const tc = useTranslations("common");
+  const router = useRouter();
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -84,7 +152,7 @@ export default function GuestsPage() {
   if (loading) {
     return (
       <div className="space-y-5">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-20 bg-slate-100 rounded-2xl animate-pulse" />
           ))}
@@ -101,13 +169,13 @@ export default function GuestsPage() {
   return (
     <div className="space-y-5">
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { icon: <Users size={16} />, label: "Total Guests", value: stats.total, color: "#3B82F6" },
-          { icon: <Star size={16} />, label: "VIP", value: stats.vip, color: "#F59E0B" },
-          { icon: <UserCheck size={16} />, label: "Returning", value: stats.returning, color: "#10B981" },
+          { icon: <Users size={16} />, label: t("totalGuests"), value: stats.total, color: "#3B82F6" },
+          { icon: <Star size={16} />, label: t("vipGuests"), value: stats.vip, color: "#F59E0B" },
+          { icon: <UserCheck size={16} />, label: t("returningGuests"), value: stats.returning, color: "#10B981" },
           { icon: <Calendar size={16} />, label: "New (30d)", value: stats.newMonth, color: "#8B5CF6" },
-          { icon: <TrendingUp size={16} />, label: "Total Revenue", value: fmt(stats.totalRevenue), color: "#10B981" },
+          { icon: <TrendingUp size={16} />, label: tc("total") + " Revenue", value: fmt(stats.totalRevenue), color: "#10B981" },
         ].map(({ icon, label, value, color }) => (
           <div key={label} className="bg-white rounded-2xl border border-slate-100 p-4">
             <div className="flex items-center justify-between mb-2">
@@ -123,15 +191,15 @@ export default function GuestsPage() {
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-52">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, phone…"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("searchPlaceholder")}
             className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
         </div>
         <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
           {([
-            { v: "all", l: `All (${guests.length})` },
-            { v: "vip", l: `⭐ VIP (${stats.vip})` },
-            { v: "returning", l: `↩ Returning (${stats.returning})` },
-            { v: "blacklisted", l: `🚫 Blacklisted` },
+            { v: "all", l: `${t("allGuests")} (${guests.length})` },
+            { v: "vip", l: `${t("vip")} (${stats.vip})` },
+            { v: "returning", l: `${t("returning")} (${stats.returning})` },
+            { v: "blacklisted", l: t("blacklisted") },
           ] as const).map(({ v, l }) => (
             <button key={v} onClick={() => setFilter(v)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filter === v ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
@@ -140,71 +208,76 @@ export default function GuestsPage() {
           ))}
         </div>
         <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-1.5 text-xs">
-          <Plus size={13} /> Add Guest
+          <Plus size={13} /> {t("addGuest")}
         </button>
       </div>
 
       {/* Guest table */}
       <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
-              {["Guest", "Contact", "Nationality", "Stays", "Revenue", "Tags", "Status", ""].map(h => (
-                <th key={h} className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-3">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={8} className="text-center text-slate-400 py-12 text-sm">No guests found</td></tr>
-            )}
-            {filtered.map(g => (
-              <tr key={g.id} onClick={() => setSelected(g)}
-                className="border-t border-slate-50 hover:bg-slate-50/60 cursor-pointer transition-colors">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                      style={{ background: g.vip ? "#FEF9C3" : "#EFF6FF", color: g.vip ? "#854D0E" : "#1D4ED8" }}>
-                      {initials(g.firstName, g.lastName)}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 flex items-center gap-1">
-                        {g.firstName} {g.lastName}
-                        {g.vip && <Star size={10} className="text-amber-400 fill-amber-400" />}
-                      </div>
-                      <div className="text-[10px] text-slate-400">Since {new Date(g.createdAt).getFullYear()}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="text-xs text-slate-600">{g.email}</div>
-                  <div className="text-[10px] text-slate-400">{g.phone}</div>
-                </td>
-                <td className="px-4 py-3 text-sm">{FLAG[g.nationality] ?? "🌍"} {g.nationality}</td>
-                <td className="px-4 py-3 text-sm font-semibold text-slate-800">{g.totalStays}</td>
-                <td className="px-4 py-3 text-sm font-bold text-slate-900">{fmt(g.totalRevenue)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {g.tags.slice(0, 2).map(tag => (
-                      <span key={tag} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-medium">{tag}</span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  {g.blacklisted ? (
-                    <span className="flex items-center gap-1 text-xs font-semibold text-red-600"><AlertTriangle size={11} /> Blacklisted</span>
-                  ) : g.vip ? (
-                    <span className="flex items-center gap-1 text-xs font-semibold text-amber-600"><Star size={11} /> VIP</span>
-                  ) : (
-                    <span className="text-xs text-slate-400">Regular</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-slate-300 text-xs">›</td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                {[t("guestName"), tc("email"), t("nationality"), t("visits"), "Revenue", "Tags", tc("status"), ""].map(h => (
+                  <th key={h} className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 py-3">{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={8} className="text-center text-slate-400 py-12 text-sm">{t("noGuests")}</td></tr>
+              )}
+              {filtered.map(g => (
+                <tr key={g.id} onClick={() => setSelected(g)}
+                  className="border-t border-slate-50 hover:bg-slate-50/60 cursor-pointer transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                        style={{ background: g.vip ? "#FEF9C3" : "#EFF6FF", color: g.vip ? "#854D0E" : "#1D4ED8" }}>
+                        {initials(g.firstName, g.lastName)}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800 flex items-center gap-1">
+                          {g.firstName} {g.lastName}
+                          {g.vip && <Star size={10} className="text-amber-400 fill-amber-400" />}
+                        </div>
+                        <div className="text-[10px] text-slate-400">Since {new Date(g.createdAt).getFullYear()}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="text-xs text-slate-600">{g.email}</div>
+                    <div className="text-[10px] text-slate-400">{g.phone}</div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">{FLAG[g.nationality] ?? "🌍"} {g.nationality}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-800">{g.totalStays}</td>
+                  <td className="px-4 py-3 text-sm font-bold text-slate-900">{fmt(g.totalRevenue)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {g.tags.slice(0, 2).map(tag => (
+                        <span key={tag} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-medium">{tag}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {g.blacklisted ? (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-red-600"><AlertTriangle size={11} /> {t("blacklisted")}</span>
+                    ) : g.vip ? (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-amber-600"><Star size={11} /> {t("vip")}</span>
+                    ) : (
+                      <span className="text-xs text-slate-400">Regular</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-slate-300 text-xs">›</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {/* Add Guest Modal */}
+      {showAdd && <AddGuestModal onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); fetchGuests(); }} />}
 
       {/* Guest detail panel */}
       {selected && (
@@ -232,8 +305,8 @@ export default function GuestsPage() {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { label: "Total Stays", value: selected.totalStays },
-                  { label: "Total Revenue", value: fmt(selected.totalRevenue) },
+                  { label: t("visits"), value: selected.totalStays },
+                  { label: tc("total") + " Revenue", value: fmt(selected.totalRevenue) },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-slate-50 rounded-xl p-3">
                     <div className="text-[10px] text-slate-400">{label}</div>
@@ -242,15 +315,20 @@ export default function GuestsPage() {
                 ))}
               </div>
               <div className="space-y-1.5 text-xs text-slate-600">
-                <div className="flex gap-2"><span className="text-slate-400 w-16 shrink-0">Email</span><span className="font-medium truncate">{selected.email}</span></div>
-                <div className="flex gap-2"><span className="text-slate-400 w-16 shrink-0">Phone</span><span className="font-medium">{selected.phone}</span></div>
+                <div className="flex gap-2"><span className="text-slate-400 w-16 shrink-0">{t("email")}</span><span className="font-medium truncate">{selected.email}</span></div>
+                <div className="flex gap-2"><span className="text-slate-400 w-16 shrink-0">{t("phone")}</span><span className="font-medium">{selected.phone}</span></div>
               </div>
               <div className="space-y-2">
-                <button className="w-full btn-primary text-xs py-2">+ New Reservation</button>
-                <button className="w-full btn-ghost text-xs py-2">✉ Send Message</button>
-                <button onClick={() => setGuests(gs => gs.map(g => g.id === selected.id ? { ...g, vip: !g.vip } : g))}
+                <button onClick={() => router.push('/dashboard/reservations')} className="w-full btn-primary text-xs py-2">+ New Reservation</button>
+                <button onClick={() => router.push('/dashboard/communications')} className="w-full btn-ghost text-xs py-2">✉ Send Message</button>
+                <button onClick={async () => {
+                    try {
+                      await api.guests.toggleVip(selected.id);
+                      fetchGuests();
+                    } catch (e: any) { alert(e.message || "Failed to update VIP status"); }
+                  }}
                   className="w-full btn-ghost text-xs py-2 text-amber-600 border-amber-200 hover:bg-amber-50">
-                  {selected.vip ? "Remove VIP" : "⭐ Mark as VIP"}
+                  {selected.vip ? "Remove VIP" : "Mark as VIP"}
                 </button>
               </div>
             </div>

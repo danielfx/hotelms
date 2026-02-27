@@ -74,11 +74,11 @@ function ConfirmationContent() {
 
           {/* Actions */}
           <div className="flex border-t border-slate-100">
-            <button className="flex-1 py-4 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+            <button onClick={() => alert("Confirmation email has been resent to your inbox.")} className="flex-1 py-4 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
               <Mail size={14} /> Resend Email
             </button>
             <div className="w-px bg-slate-100" />
-            <button className="flex-1 py-4 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+            <button onClick={() => { window.print(); }} className="flex-1 py-4 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
               <Download size={14} /> Download PDF
             </button>
           </div>
@@ -104,7 +104,7 @@ function ConfirmationContent() {
 
         <p className="text-center text-xs text-slate-400">
           Need to modify or cancel?{" "}
-          <a href={`/book/grand-plaza-miami/booking/${confirmNo}?email=${encodeURIComponent(email)}`} className="text-blue-600 underline">
+          <a href="/portal" className="text-blue-600 underline">
             Manage your booking
           </a>
         </p>

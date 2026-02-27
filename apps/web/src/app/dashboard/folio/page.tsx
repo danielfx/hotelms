@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { DollarSign, Plus, X, CreditCard, Banknote, Receipt } from "lucide-react";
+import { useTranslations } from "next-intl";
 import api from "@/lib/api";
 
 const CHARGE_TYPES = ["ROOM","FB","MINIBAR","LAUNDRY","PARKING","SPA","TELEPHONE","DAMAGE","EARLY_CHECKIN","LATE_CHECKOUT","UPGRADE","RESORT_FEE","OTHER"];
@@ -100,6 +101,8 @@ export default function FolioPage() {
 }
 
 function FolioContent() {
+  const t = useTranslations("folio");
+  const tc = useTranslations("common");
   const searchParams = useSearchParams();
   const [folio, setFolio] = useState<FolioData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,7 +171,7 @@ function FolioContent() {
             <div className="h-8 bg-slate-200 rounded w-1/2 mx-auto"></div>
             <div className="h-4 bg-slate-200 rounded w-2/3 mx-auto"></div>
           </div>
-          <p className="text-sm text-slate-400 mt-4">Loading folio...</p>
+          <p className="text-sm text-slate-400 mt-4">{tc("loading")}</p>
         </div>
       </div>
     );
@@ -180,9 +183,9 @@ function FolioContent() {
         <div className="bg-white rounded-2xl border border-slate-100 p-8">
           <div className="text-center mb-6">
             <DollarSign size={32} className="mx-auto text-slate-300 mb-2" />
-            <h3 className="font-bold text-slate-700 text-lg">Guest Folio</h3>
+            <h3 className="font-bold text-slate-700 text-lg">{t("title")}</h3>
             <p className="text-sm text-slate-400 mt-1">
-              {error ? error : "Enter a reservation ID to view its folio."}
+              {error ? error : t("searchPlaceholder")}
             </p>
           </div>
           <div className="flex gap-2 max-w-md mx-auto">
@@ -190,11 +193,11 @@ function FolioContent() {
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSearch()}
-              placeholder="Reservation ID"
+              placeholder={t("searchPlaceholder")}
               className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
             />
             <button onClick={handleSearch} className="btn-primary text-xs px-4 py-2">
-              Load Folio
+              {tc("search")}
             </button>
           </div>
         </div>
@@ -326,11 +329,11 @@ function FolioContent() {
           value={searchInput}
           onChange={e => setSearchInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && handleSearch()}
-          placeholder="Search by reservation ID..."
+          placeholder={t("searchPlaceholder")}
           className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
         />
         <button onClick={handleSearch} className="btn-primary text-xs px-4 py-2">
-          Load Folio
+          {tc("search")}
         </button>
       </div>
 
@@ -343,21 +346,21 @@ function FolioContent() {
               {folio.reservation.guest.firstName} {folio.reservation.guest.lastName}
             </div>
             <div className="text-sm text-slate-500 mt-0.5">
-              Room {folio.reservation.room.number} · {folio.reservation.room.roomType.name} ·{" "}
+              {tc("room")} {folio.reservation.room.number} · {folio.reservation.room.roomType.name} ·{" "}
               {folio.reservation.checkIn} → {folio.reservation.checkOut} ({folio.reservation.nights}n)
             </div>
           </div>
           <div className="flex gap-3 flex-wrap">
             <div className="text-right">
-              <div className="text-xs text-slate-400">Total Charges</div>
+              <div className="text-xs text-slate-400">{t("totalCharges")}</div>
               <div className="text-lg font-bold text-slate-900">{fmt(folio.totalCharges)}</div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-slate-400">Paid</div>
+              <div className="text-xs text-slate-400">{t("paid")}</div>
               <div className="text-lg font-bold text-emerald-600">{fmt(folio.totalPayments)}</div>
             </div>
             <div className="text-right bg-slate-50 rounded-xl px-4 py-2">
-              <div className="text-xs text-slate-400">Balance Due</div>
+              <div className="text-xs text-slate-400">{t("balance")}</div>
               <div className={`text-xl font-extrabold ${balance > 0 ? "text-red-600" : "text-emerald-600"}`}>
                 {fmt(balance)}
               </div>
@@ -370,82 +373,84 @@ function FolioContent() {
         {/* Charges */}
         <div className="lg:col-span-2 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 text-sm">Charges</h3>
+            <h3 className="font-bold text-slate-800 text-sm">{t("charges")}</h3>
             <button onClick={() => setShowAddCharge(true)} className="btn-primary text-xs py-1.5 flex items-center gap-1">
-              <Plus size={12} /> Add Charge
+              <Plus size={12} /> {t("addCharge")}
             </button>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  {["Date", "Description", "Qty", "Unit", "Amount", ""].map(h => (
-                    <th key={h} className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 py-2.5">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {folio.charges.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-8 text-center text-xs text-slate-400">No charges yet</td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px]">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    {[tc("date"), tc("description"), "Qty", "Unit", tc("amount"), ""].map(h => (
+                      <th key={h} className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 py-2.5">{h}</th>
+                    ))}
                   </tr>
-                ) : folio.charges.map(c => (
-                  <tr key={c.id} className={`border-t border-slate-50 ${c.voided ? "opacity-40" : ""}`}>
-                    <td className="px-3 py-2.5 text-xs text-slate-400">{c.date.slice(5)}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm">{CHARGE_ICONS[c.type] ?? "📋"}</span>
-                        <div>
-                          <div className="text-xs font-medium text-slate-800">{c.description}</div>
-                          {c.voided && <div className="text-[10px] text-red-500 font-semibold">VOIDED</div>}
+                </thead>
+                <tbody>
+                  {folio.charges.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-xs text-slate-400">{t("noCharges")}</td>
+                    </tr>
+                  ) : folio.charges.map(c => (
+                    <tr key={c.id} className={`border-t border-slate-50 ${c.voided ? "opacity-40" : ""}`}>
+                      <td className="px-3 py-2.5 text-xs text-slate-400">{c.date.slice(5)}</td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">{CHARGE_ICONS[c.type] ?? "📋"}</span>
+                          <div>
+                            <div className="text-xs font-medium text-slate-800">{c.description}</div>
+                            {c.voided && <div className="text-[10px] text-red-500 font-semibold">VOIDED</div>}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-500">{c.quantity}</td>
-                    <td className="px-3 py-2.5 text-xs text-slate-500">{fmt(c.unitPrice)}</td>
-                    <td className="px-3 py-2.5 text-xs font-semibold text-slate-800">{fmt(c.amount)}</td>
-                    <td className="px-3 py-2.5">
-                      {!c.voided && c.type !== "ROOM" && (
-                        <button onClick={() => handleVoidCharge(c.id)}
-                          className="text-[10px] text-red-400 hover:text-red-600 font-medium">void</button>
-                      )}
-                    </td>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-slate-500">{c.quantity}</td>
+                      <td className="px-3 py-2.5 text-xs text-slate-500">{fmt(c.unitPrice)}</td>
+                      <td className="px-3 py-2.5 text-xs font-semibold text-slate-800">{fmt(c.amount)}</td>
+                      <td className="px-3 py-2.5">
+                        {!c.voided && c.type !== "ROOM" && (
+                          <button onClick={() => handleVoidCharge(c.id)}
+                            className="text-[10px] text-red-400 hover:text-red-600 font-medium">void</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Tax row */}
+                  <tr className="border-t border-slate-100 bg-slate-50/50">
+                    <td colSpan={4} className="px-3 py-2 text-xs text-slate-500 text-right">Taxes (7%)</td>
+                    <td className="px-3 py-2 text-xs font-semibold text-slate-600">{fmt(folio.totalTax)}</td>
+                    <td />
                   </tr>
-                ))}
-                {/* Tax row */}
-                <tr className="border-t border-slate-100 bg-slate-50/50">
-                  <td colSpan={4} className="px-3 py-2 text-xs text-slate-500 text-right">Taxes (7%)</td>
-                  <td className="px-3 py-2 text-xs font-semibold text-slate-600">{fmt(folio.totalTax)}</td>
-                  <td />
-                </tr>
-                {/* Total row */}
-                <tr className="border-t-2 border-slate-200">
-                  <td colSpan={4} className="px-3 py-3 text-sm font-bold text-slate-800 text-right">Total</td>
-                  <td className="px-3 py-3 text-sm font-extrabold text-slate-900">{fmt(folio.totalCharges)}</td>
-                  <td />
-                </tr>
-              </tbody>
-            </table>
+                  {/* Total row */}
+                  <tr className="border-t-2 border-slate-200">
+                    <td colSpan={4} className="px-3 py-3 text-sm font-bold text-slate-800 text-right">{tc("total")}</td>
+                    <td className="px-3 py-3 text-sm font-extrabold text-slate-900">{fmt(folio.totalCharges)}</td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Add Charge Form */}
           {showAddCharge && (
             <div className="bg-white rounded-2xl border border-blue-200 p-4 shadow-lg">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-sm font-bold text-slate-800">New Charge</span>
+                <span className="text-sm font-bold text-slate-800">{t("addCharge")}</span>
                 <button onClick={() => setShowAddCharge(false)}><X size={14} className="text-slate-400" /></button>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">Type</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("type")}</label>
                   <select value={newCharge.type} onChange={e => setNewCharge(f => ({ ...f, type: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
-                    {CHARGE_TYPES.map(t => <option key={t} value={t}>{CHARGE_ICONS[t]} {t.replace(/_/g, " ")}</option>)}
+                    {CHARGE_TYPES.map(ct => <option key={ct} value={ct}>{CHARGE_ICONS[ct]} {ct.replace(/_/g, " ")}</option>)}
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">Description *</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{t("chargeDescription")} *</label>
                   <input value={newCharge.description} onChange={e => setNewCharge(f => ({ ...f, description: e.target.value }))}
                     placeholder="e.g. Dinner at La Terraza"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
@@ -464,12 +469,12 @@ function FolioContent() {
               </div>
               {newCharge.unitPrice > 0 && (
                 <div className="mt-2 text-xs text-slate-500">
-                  Total: <strong>{fmt(newCharge.quantity * newCharge.unitPrice)}</strong> + tax
+                  {tc("total")}: <strong>{fmt(newCharge.quantity * newCharge.unitPrice)}</strong> + tax
                 </div>
               )}
               <div className="flex gap-2 mt-3">
-                <button onClick={() => setShowAddCharge(false)} className="flex-1 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 hover:bg-slate-50">Cancel</button>
-                <button onClick={handleAddCharge} className="flex-[2] py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold">Post Charge</button>
+                <button onClick={() => setShowAddCharge(false)} className="flex-1 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 hover:bg-slate-50">{tc("cancel")}</button>
+                <button onClick={handleAddCharge} className="flex-[2] py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold">{t("addCharge")}</button>
               </div>
             </div>
           )}
@@ -478,9 +483,9 @@ function FolioContent() {
         {/* Payments */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 text-sm">Payments</h3>
+            <h3 className="font-bold text-slate-800 text-sm">{t("payments")}</h3>
             <button onClick={() => setShowAddPayment(true)} className="btn-primary text-xs py-1.5 flex items-center gap-1">
-              <Plus size={12} /> Add Payment
+              <Plus size={12} /> {t("addPayment")}
             </button>
           </div>
 
@@ -501,20 +506,20 @@ function FolioContent() {
             ))}
 
             {folio.payments.length === 0 && (
-              <div className="bg-slate-50 rounded-xl p-6 text-center text-xs text-slate-400">No payments recorded</div>
+              <div className="bg-slate-50 rounded-xl p-6 text-center text-xs text-slate-400">{t("noPayments")}</div>
             )}
           </div>
 
           {/* Balance summary */}
           <div className="bg-slate-50 rounded-xl p-4 space-y-2">
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Total Charges</span><span className="font-semibold text-slate-800">{fmt(folio.totalCharges)}</span>
+              <span>{t("totalCharges")}</span><span className="font-semibold text-slate-800">{fmt(folio.totalCharges)}</span>
             </div>
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Total Paid</span><span className="font-semibold text-emerald-600">{fmt(folio.totalPayments)}</span>
+              <span>{t("totalPayments")}</span><span className="font-semibold text-emerald-600">{fmt(folio.totalPayments)}</span>
             </div>
             <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-bold">
-              <span className="text-slate-700">Balance Due</span>
+              <span className="text-slate-700">{t("balance")}</span>
               <span className={balance > 0 ? "text-red-600" : "text-emerald-600"}>{fmt(balance)}</span>
             </div>
           </div>
@@ -523,18 +528,18 @@ function FolioContent() {
           {showAddPayment && (
             <div className="bg-white rounded-xl border border-emerald-200 p-4 shadow-lg">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-sm font-bold text-slate-800">Record Payment</span>
+                <span className="text-sm font-bold text-slate-800">{t("addPayment")}</span>
                 <button onClick={() => setShowAddPayment(false)}><X size={14} className="text-slate-400" /></button>
               </div>
               <div className="space-y-2">
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">Amount *</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("amount")} *</label>
                   <input type="number" min={0} step={0.01} value={newPayment.amount || ""} onChange={e => setNewPayment(f => ({ ...f, amount: Number(e.target.value) }))}
-                    placeholder={`Balance: ${fmt(balance)}`}
+                    placeholder={`${t("balance")}: ${fmt(balance)}`}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">Method</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{t("paymentMethod")}</label>
                   <select value={newPayment.method} onChange={e => setNewPayment(f => ({ ...f, method: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
                     {["CREDIT_CARD","CASH","DEBIT_CARD","BANK_TRANSFER"].map(m => <option key={m} value={m}>{m.replace(/_/g," ")}</option>)}
@@ -552,8 +557,8 @@ function FolioContent() {
                   className="text-xs text-blue-500 hover:underline">Fill balance ({fmt(balance)})</button>
               </div>
               <div className="flex gap-2 mt-3">
-                <button onClick={() => setShowAddPayment(false)} className="flex-1 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 hover:bg-slate-50">Cancel</button>
-                <button onClick={handleAddPayment} className="flex-[2] py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold">Post Payment</button>
+                <button onClick={() => setShowAddPayment(false)} className="flex-1 py-2 rounded-xl border border-slate-200 text-xs text-slate-500 hover:bg-slate-50">{tc("cancel")}</button>
+                <button onClick={handleAddPayment} className="flex-[2] py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold">{t("addPayment")}</button>
               </div>
             </div>
           )}
@@ -575,7 +580,7 @@ function FolioContent() {
                   } catch (e: any) { alert(e.message || "Failed to close folio"); }
                 }}
                 className="w-full py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
-                <X size={13} /> Close Folio
+                <X size={13} /> {tc("close")} Folio
               </button>
             )}
             {folio.status === "CLOSED" && (

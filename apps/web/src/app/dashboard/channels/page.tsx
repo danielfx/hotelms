@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { RefreshCw, Plus, Wifi, WifiOff, AlertCircle, Check, ChevronRight, Clock, ArrowDownToLine, ArrowUpToLine, X, ExternalLink } from "lucide-react";
 import api from "@/lib/api";
 
@@ -16,13 +17,6 @@ const CHANNELS: Record<string, { name: string; logo: string; color: string; bg: 
   TRIP_COM:    { name: "Trip.com",      logo: "T", color: "#007DFF", bg: "#EFF7FF", commission: 12 },
   GDS_SABRE:   { name: "Sabre GDS",     logo: "S", color: "#1B3B6F", bg: "#EFF4FF", commission: 10 },
   GDS_AMADEUS: { name: "Amadeus GDS",   logo: "M", color: "#0072CE", bg: "#EFF6FF", commission: 10 },
-};
-
-const STATUS_CFG: Record<ChannelStatus, { label: string; color: string; bg: string; icon: JSX.Element }> = {
-  ACTIVE:        { label: "Active",        color: "#059669", bg: "#ECFDF5", icon: <Check size={11} /> },
-  ERROR:         { label: "Error",         color: "#DC2626", bg: "#FEF2F2", icon: <AlertCircle size={11} /> },
-  INACTIVE:      { label: "Inactive",      color: "#94A3B8", bg: "#F8FAFC", icon: <WifiOff size={11} /> },
-  PENDING_SETUP: { label: "Pending Setup", color: "#D97706", bg: "#FFFBEB", icon: <Clock size={11} /> },
 };
 
 interface ChannelConnection {
@@ -62,7 +56,7 @@ function mapConnection(raw: any): ChannelConnection {
   };
 }
 
-const fmt = (n: number) => `$${Number(n).toLocaleString()}`;
+const fmtMoney = (n: number) => `$${Number(n).toLocaleString()}`;
 const timeAgo = (dateStr: string | null) => {
   if (!dateStr) return "Never";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -76,6 +70,9 @@ const timeAgo = (dateStr: string | null) => {
 // ─── SYNC MODAL ───────────────────────────────────────────────────────────────
 
 function SyncModal({ conn, onClose }: { conn: ChannelConnection; onClose: () => void }) {
+  const t = useTranslations("channels");
+  const tc = useTranslations("common");
+
   const [syncing, setSyncing] = useState(false);
   const [done, setDone] = useState(false);
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split("T")[0]);
@@ -86,13 +83,14 @@ function SyncModal({ conn, onClose }: { conn: ChannelConnection; onClose: () => 
 
   const handleSync = () => {
     setSyncing(true);
+    const range = { dateFrom, dateTo };
     const syncPromise = syncType === "rates"
-      ? api.channels.sync(conn.id, "rates")
+      ? api.channels.sync(conn.id, "rates", range)
       : syncType === "inventory"
-        ? api.channels.sync(conn.id, "inventory")
+        ? api.channels.sync(conn.id, "inventory", range)
         : Promise.all([
-            api.channels.sync(conn.id, "rates"),
-            api.channels.sync(conn.id, "inventory"),
+            api.channels.sync(conn.id, "rates", range),
+            api.channels.sync(conn.id, "inventory", range),
           ]);
     syncPromise
       .then(() => { setSyncing(false); setDone(true); })
@@ -106,7 +104,7 @@ function SyncModal({ conn, onClose }: { conn: ChannelConnection; onClose: () => 
           <div className="flex items-center gap-3">
             <span className="text-2xl font-bold" style={{ color: ch.color }}>{ch.logo}</span>
             <div>
-              <h3 className="font-bold text-slate-900">Sync {ch.name}</h3>
+              <h3 className="font-bold text-slate-900">{t("syncNow")} {ch.name}</h3>
               <p className="text-xs text-slate-400">Hotel ID: {conn.externalHotelId}</p>
             </div>
           </div>
@@ -118,7 +116,7 @@ function SyncModal({ conn, onClose }: { conn: ChannelConnection; onClose: () => 
               <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Check size={28} className="text-emerald-500" />
               </div>
-              <div className="font-bold text-slate-900">Sync Complete</div>
+              <div className="font-bold text-slate-900">{t("syncNow")} - Done</div>
               <div className="text-sm text-slate-400 mt-1">Rates & inventory pushed successfully</div>
               <button onClick={onClose} className="mt-4 btn-primary text-sm">Done</button>
             </div>
@@ -134,12 +132,12 @@ function SyncModal({ conn, onClose }: { conn: ChannelConnection; onClose: () => 
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">From</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("from")}</label>
                   <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">To</label>
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">{tc("to")}</label>
                   <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                 </div>
@@ -149,13 +147,13 @@ function SyncModal({ conn, onClose }: { conn: ChannelConnection; onClose: () => 
                 to <strong>{ch.name}</strong>
               </div>
               <div className="flex gap-3">
-                <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">{tc("cancel")}</button>
                 <button onClick={handleSync} disabled={syncing}
                   className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white text-sm font-semibold flex items-center justify-center gap-2">
                   {syncing ? (
-                    <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Syncing...</>
+                    <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> {t("syncing")}...</>
                   ) : (
-                    <><RefreshCw size={14} /> Start Sync</>
+                    <><RefreshCw size={14} /> {t("syncNow")}</>
                   )}
                 </button>
               </div>
@@ -170,6 +168,9 @@ function SyncModal({ conn, onClose }: { conn: ChannelConnection; onClose: () => 
 // ─── CONNECT MODAL ────────────────────────────────────────────────────────────
 
 function ConnectModal({ connections, onClose, onConnected }: { connections: ChannelConnection[]; onClose: () => void; onConnected: () => void }) {
+  const t = useTranslations("channels");
+  const tc = useTranslations("common");
+
   const [step, setStep] = useState<"pick" | "configure" | "done">("pick");
   const [selected, setSelected] = useState<string | null>(null);
   const [hotelId, setHotelId] = useState("");
@@ -192,7 +193,7 @@ function ConnectModal({ connections, onClose, onConnected }: { connections: Chan
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-slate-900">Connect New Channel</h3>
+          <h3 className="font-bold text-slate-900">{t("addChannel")}</h3>
           <button onClick={onClose}><X size={14} className="text-slate-400" /></button>
         </div>
         <div className="p-6">
@@ -211,7 +212,7 @@ function ConnectModal({ connections, onClose, onConnected }: { connections: Chan
                         <span className="text-xl font-bold" style={{ color: cfg.color }}>{cfg.logo}</span>
                         <div>
                           <div className="text-sm font-semibold text-slate-800">{cfg.name}</div>
-                          <div className="text-[10px] text-slate-400">{cfg.commission}% commission</div>
+                          <div className="text-[10px] text-slate-400">{cfg.commission}% {t("commission")}</div>
                         </div>
                       </button>
                     );
@@ -227,7 +228,7 @@ function ConnectModal({ connections, onClose, onConnected }: { connections: Chan
                 <span className="text-3xl font-bold" style={{ color: CHANNELS[selected]?.color }}>{CHANNELS[selected]?.logo}</span>
                 <div>
                   <div className="font-bold text-slate-900">{CHANNELS[selected]?.name ?? selected}</div>
-                  <div className="text-xs text-slate-500">{CHANNELS[selected]?.commission ?? 0}% commission</div>
+                  <div className="text-xs text-slate-500">{CHANNELS[selected]?.commission ?? 0}% {t("commission")}</div>
                 </div>
               </div>
               <div>
@@ -245,10 +246,10 @@ function ConnectModal({ connections, onClose, onConnected }: { connections: Chan
                 Credentials are encrypted and stored securely. Never shared with third parties.
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setStep("pick")} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Back</button>
+                <button onClick={() => setStep("pick")} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">{tc("back")}</button>
                 <button onClick={handleConnect} disabled={!hotelId || !apiKey || connecting}
                   className="flex-[2] py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-blue-200 text-white text-sm font-semibold flex items-center justify-center gap-2">
-                  {connecting ? <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Connecting...</> : "Connect Channel"}
+                  {connecting ? <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Connecting...</> : t("addChannel")}
                 </button>
               </div>
             </div>
@@ -259,7 +260,7 @@ function ConnectModal({ connections, onClose, onConnected }: { connections: Chan
               <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Check size={28} className="text-emerald-500" />
               </div>
-              <div className="font-bold text-slate-900">{CHANNELS[selected]?.name ?? selected} Connected!</div>
+              <div className="font-bold text-slate-900">{CHANNELS[selected]?.name ?? selected} {t("connected")}!</div>
               <div className="text-sm text-slate-400 mt-1">Initial sync will start automatically</div>
               <button onClick={onClose} className="mt-4 btn-primary text-sm">Done</button>
             </div>
@@ -273,6 +274,16 @@ function ConnectModal({ connections, onClose, onConnected }: { connections: Chan
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function ChannelsPage() {
+  const t = useTranslations("channels");
+  const tc = useTranslations("common");
+
+  const STATUS_CFG: Record<ChannelStatus, { label: string; color: string; bg: string; icon: JSX.Element }> = {
+    ACTIVE:        { label: t("connected"),    color: "#059669", bg: "#ECFDF5", icon: <Check size={11} /> },
+    ERROR:         { label: t("error"),        color: "#DC2626", bg: "#FEF2F2", icon: <AlertCircle size={11} /> },
+    INACTIVE:      { label: t("disconnected"), color: "#94A3B8", bg: "#F8FAFC", icon: <WifiOff size={11} /> },
+    PENDING_SETUP: { label: "Pending Setup",   color: "#D97706", bg: "#FFFBEB", icon: <Clock size={11} /> },
+  };
+
   const [connections, setConnections] = useState<ChannelConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -324,7 +335,7 @@ export default function ChannelsPage() {
           ))}
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center">
-          <p className="text-sm text-slate-400">Loading channel connections...</p>
+          <p className="text-sm text-slate-400">{tc("loading")}</p>
         </div>
       </div>
     );
@@ -335,10 +346,10 @@ export default function ChannelsPage() {
       {/* Top stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Connected Channels", value: connections.length, sub: `${activeCount} active`, color: "#3B82F6" },
+          { label: "Connected Channels", value: connections.length, sub: `${activeCount} ${tc("active").toLowerCase()}`, color: "#3B82F6" },
           { label: "Total OTA Bookings", value: totalBookings, sub: "all time", color: "#8B5CF6" },
-          { label: "OTA Revenue (30d)", value: fmt(totalRevenue), sub: "gross", color: "#10B981" },
-          { label: "Avg Commission", value: `${connections.length > 0 ? Math.round(connections.reduce((s,c) => s + c.commissionPct, 0) / connections.length) : 0}%`, sub: "across channels", color: "#F59E0B" },
+          { label: "OTA Revenue (30d)", value: fmtMoney(totalRevenue), sub: "gross", color: "#10B981" },
+          { label: t("commission"), value: `${connections.length > 0 ? Math.round(connections.reduce((s,c) => s + c.commissionPct, 0) / connections.length) : 0}%`, sub: "across channels", color: "#F59E0B" },
         ].map(({ label, value, sub, color }) => (
           <div key={label} className="bg-white rounded-2xl border border-slate-100 p-4">
             <div className="text-xs text-slate-400 mb-2">{label}</div>
@@ -350,25 +361,25 @@ export default function ChannelsPage() {
 
       {/* Actions */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="font-bold text-slate-900">Channel Connections</h2>
+        <h2 className="font-bold text-slate-900">{t("title")}</h2>
         <div className="flex gap-2">
           <button onClick={handleSyncAll} disabled={!!syncing}
             className="btn-ghost text-xs flex items-center gap-1.5 disabled:opacity-50">
             <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
-            {syncing === "all" ? "Syncing All..." : "Sync All"}
+            {syncing === "all" ? t("syncing") + "..." : t("syncAll")}
           </button>
           <button onClick={() => setShowConnect(true)} className="btn-primary text-xs flex items-center gap-1.5">
-            <Plus size={13} /> Connect Channel
+            <Plus size={13} /> {t("addChannel")}
           </button>
         </div>
       </div>
 
       {/* Channel cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {connections.length === 0 && !error && (
           <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-100 p-8 text-center">
             <Wifi size={32} className="mx-auto text-slate-300 mb-2" />
-            <h3 className="font-bold text-slate-700 text-lg">No Channels Connected</h3>
+            <h3 className="font-bold text-slate-700 text-lg">{t("noChannels")}</h3>
             <p className="text-sm text-slate-400 mt-1">Connect your first OTA or GDS channel to start receiving bookings.</p>
           </div>
         )}
@@ -401,8 +412,8 @@ export default function ChannelsPage() {
               <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-b border-slate-100">
                 {[
                   { label: "Bookings", value: conn.stats.totalReservations },
-                  { label: "30d Revenue", value: fmt(conn.stats.last30DayRevenue) },
-                  { label: "Commission", value: `${conn.commissionPct}%` },
+                  { label: "30d Revenue", value: fmtMoney(conn.stats.last30DayRevenue) },
+                  { label: t("commission"), value: `${conn.commissionPct}%` },
                 ].map(({ label, value }) => (
                   <div key={label} className="p-3 text-center">
                     <div className="text-xs font-bold text-slate-900">{value}</div>
@@ -428,7 +439,7 @@ export default function ChannelsPage() {
                 ))}
                 <div className="flex items-center gap-1 text-[10px] text-slate-400 pt-1">
                   <Clock size={9} />
-                  Last sync: {timeAgo(conn.lastSyncAt)}
+                  {t("lastSync")}: {timeAgo(conn.lastSyncAt)}
                   {conn.autoSync && <span className="ml-auto text-emerald-500 font-semibold">Auto-sync ON</span>}
                 </div>
               </div>
@@ -437,15 +448,28 @@ export default function ChannelsPage() {
               <div className="flex border-t border-slate-100">
                 <button onClick={() => setSelectedSync(conn)}
                   className="flex-1 py-3 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1.5">
-                  <RefreshCw size={12} /> Sync Now
+                  <RefreshCw size={12} /> {t("syncNow")}
                 </button>
                 <div className="w-px bg-slate-100" />
-                <button onClick={() => setSelectedSync(conn)}
+                <button onClick={async () => {
+                    try {
+                      await api.channels.pullReservations(conn.id);
+                      alert("Reservations pulled successfully");
+                      fetchConnections();
+                    } catch (e: any) { alert(e.message || "Failed to pull reservations"); }
+                  }}
                   className="flex-1 py-3 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5">
                   <ArrowDownToLine size={12} /> Pull Res.
                 </button>
                 <div className="w-px bg-slate-100" />
-                <button className="px-4 py-3 text-xs font-semibold text-slate-400 hover:bg-slate-50 transition-colors">
+                <button onClick={async () => {
+                    try {
+                      const logs = await api.channels.logs(conn.id);
+                      const recent = Array.isArray(logs) ? logs.slice(0, 5) : [];
+                      alert(recent.length > 0 ? JSON.stringify(recent, null, 2) : "No logs available for this channel.");
+                    } catch { alert("Failed to load channel logs."); }
+                  }}
+                  className="px-4 py-3 text-xs font-semibold text-slate-400 hover:bg-slate-50 transition-colors">
                   <ChevronRight size={13} />
                 </button>
               </div>
@@ -455,7 +479,13 @@ export default function ChannelsPage() {
                   <div className="flex items-center gap-1.5 text-[10px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
                     <AlertCircle size={11} />
                     Last sync failed. Check API credentials.
-                    <button className="ml-auto underline">Reconnect</button>
+                    <button className="ml-auto underline" onClick={async () => {
+                      try {
+                        await api.channels.sync(conn.id, 'rates');
+                        await api.channels.sync(conn.id, 'inventory');
+                        fetchConnections();
+                      } catch (e: any) { alert(e.message || "Reconnect failed"); }
+                    }}>Reconnect</button>
                   </div>
                 </div>
               )}
@@ -469,7 +499,7 @@ export default function ChannelsPage() {
           <div className="w-12 h-12 rounded-2xl bg-white border-2 border-dashed border-slate-300 flex items-center justify-center">
             <Plus size={20} />
           </div>
-          <div className="text-sm font-semibold">Connect New Channel</div>
+          <div className="text-sm font-semibold">{t("addChannel")}</div>
           <div className="text-xs text-center">Booking.com, Expedia, Airbnb, GDS and more</div>
         </button>
       </div>

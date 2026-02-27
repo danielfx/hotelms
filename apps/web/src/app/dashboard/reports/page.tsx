@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import api from "@/lib/api";
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, BedDouble, Users, Calendar, Download, Filter, Loader2, ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 
@@ -32,6 +33,9 @@ const DEPT_LABELS: Record<string, string> = {
 // ─── USALI Tab Component ──────────────────────────────────────────────────
 
 function UsaliTab() {
+  const t = useTranslations("reports");
+  const tc = useTranslations("common");
+
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
   const [report, setReport] = useState<any>(null);
@@ -111,7 +115,7 @@ function UsaliTab() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="animate-spin text-blue-500" size={28} />
-        <span className="ml-3 text-slate-500 text-sm">Loading USALI report...</span>
+        <span className="ml-3 text-slate-500 text-sm">{tc("loading")}</span>
       </div>
     );
   }
@@ -179,12 +183,12 @@ function UsaliTab() {
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: "Room Nights Sold", value: String(kpis.roomNightsSold ?? 0) },
-          { label: "Occupancy", value: `${kpis.occupancy ?? 0}%` },
-          { label: "ADR", value: `$${fmt(kpis.adr ?? 0)}` },
-          { label: "RevPAR", value: `$${fmt(kpis.revpar ?? 0)}` },
+          { label: t("occupancyRate"), value: `${kpis.occupancy ?? 0}%` },
+          { label: t("adr"), value: `$${fmt(kpis.adr ?? 0)}` },
+          { label: t("revpar"), value: `$${fmt(kpis.revpar ?? 0)}` },
           { label: "GOP", value: `$${fmt(report?.gop ?? 0)}` },
           { label: "GOP Margin", value: `${report?.gopMargin ?? 0}%` },
         ].map(k => (
@@ -198,106 +202,108 @@ function UsaliTab() {
       {/* P&L Statement */}
       <div className="bg-white rounded-xl border border-slate-200">
         <div className="px-4 py-3 border-b border-slate-200">
-          <h3 className="font-semibold text-slate-900">USALI Summary Operating Statement</h3>
+          <h3 className="font-semibold text-slate-900">{t("profitAndLoss")}</h3>
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between py-2 px-4 bg-slate-50 text-xs font-medium text-slate-500 uppercase tracking-wide">
-          <span>Department</span>
-          <div className="flex items-center gap-8">
-            <span className="w-28 text-right">Revenue</span>
-            <span className="w-28 text-right">Expenses</span>
-            <span className="w-28 text-right">Profit</span>
-          </div>
-        </div>
-
-        {/* Operated Departments */}
-        {["rooms", "fb"].map(k => depts[k] && renderDeptRow(k, depts[k]))}
-
-        {/* Other Operated */}
-        {["spa", "parking", "laundry", "telephone"].map(k => depts[k] && (depts[k].revenue > 0 || depts[k].totalExpenses > 0) && renderDeptRow(k, depts[k]))}
-
-        {/* Total Departmental */}
-        <div className="flex items-center justify-between py-3 px-4 bg-blue-50 border-y border-blue-100 font-semibold">
-          <span className="text-blue-900">Total Departmental Profit</span>
-          <div className="flex items-center gap-8 text-sm">
-            <span className="w-28 text-right text-green-700">${fmt(report?.totalRevenue ?? 0)}</span>
-            <span className="w-28 text-right text-red-600">(${fmt(report?.totalDeptExpenses ?? 0)})</span>
-            <span className="w-28 text-right text-blue-900 font-bold">${fmt(report?.totalDeptProfit ?? 0)}</span>
-          </div>
-        </div>
-
-        {/* Undistributed Operating Expenses */}
-        <div className="px-4 pt-3 pb-1">
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Undistributed Operating Expenses</span>
-        </div>
-        {["admin", "marketing", "maintenance", "energy"].map(k => (
-          undist[k] > 0 && (
-            <div key={k} className="flex items-center justify-between py-2 px-4 pl-10 text-sm">
-              <span className="text-slate-600">{DEPT_LABELS[k] || k}</span>
-              <div className="flex items-center gap-8">
-                <span className="w-28" />
-                <span className="w-28 text-right text-red-600">(${fmt(undist[k])})</span>
-                <span className="w-28" />
-              </div>
+        <div className="overflow-x-auto">
+          <div className="flex items-center justify-between py-2 px-4 bg-slate-50 text-xs font-medium text-slate-500 uppercase tracking-wide min-w-[600px]">
+            <span>{t("departmental")}</span>
+            <div className="flex items-center gap-8">
+              <span className="w-28 text-right">{t("revenue")}</span>
+              <span className="w-28 text-right">{t("expenses")}</span>
+              <span className="w-28 text-right">{t("grossProfit")}</span>
             </div>
-          )
-        ))}
-        <div className="flex items-center justify-between py-2 px-4 text-sm border-t border-slate-100">
-          <span className="font-medium text-slate-700">Total Undistributed</span>
-          <div className="flex items-center gap-8">
-            <span className="w-28" />
-            <span className="w-28 text-right text-red-600 font-medium">(${fmt(undist.total ?? 0)})</span>
-            <span className="w-28" />
           </div>
-        </div>
 
-        {/* GOP */}
-        <div className="flex items-center justify-between py-3 px-4 bg-green-50 border-y border-green-100 font-bold">
-          <span className="text-green-900">Gross Operating Profit (GOP)</span>
-          <div className="flex items-center gap-8 text-sm">
-            <span className="w-28" />
-            <span className="w-28" />
-            <span className="w-28 text-right text-green-900 text-base">${fmt(report?.gop ?? 0)}</span>
-          </div>
-        </div>
+          {/* Operated Departments */}
+          {["rooms", "fb"].map(k => depts[k] && renderDeptRow(k, depts[k]))}
 
-        {/* Taxes & Fees */}
-        {((report?.taxes?.propertyTax ?? 0) > 0 || (report?.taxes?.cityTax ?? 0) > 0 || (report?.resortFees ?? 0) > 0) && (
-          <>
-            <div className="px-4 pt-3 pb-1">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Taxes & Fees Collected</span>
+          {/* Other Operated */}
+          {["spa", "parking", "laundry", "telephone"].map(k => depts[k] && (depts[k].revenue > 0 || depts[k].totalExpenses > 0) && renderDeptRow(k, depts[k]))}
+
+          {/* Total Departmental */}
+          <div className="flex items-center justify-between py-3 px-4 bg-blue-50 border-y border-blue-100 font-semibold min-w-[600px]">
+            <span className="text-blue-900">{t("departmental")}</span>
+            <div className="flex items-center gap-8 text-sm">
+              <span className="w-28 text-right text-green-700">${fmt(report?.totalRevenue ?? 0)}</span>
+              <span className="w-28 text-right text-red-600">(${fmt(report?.totalDeptExpenses ?? 0)})</span>
+              <span className="w-28 text-right text-blue-900 font-bold">${fmt(report?.totalDeptProfit ?? 0)}</span>
             </div>
-            {(report?.taxes?.propertyTax ?? 0) > 0 && (
-              <div className="flex items-center justify-between py-2 px-4 pl-10 text-sm">
-                <span className="text-slate-600">Property Tax</span>
-                <span className="text-slate-700">${fmt(report.taxes.propertyTax)}</span>
+          </div>
+
+          {/* Undistributed Operating Expenses */}
+          <div className="px-4 pt-3 pb-1">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t("undistributed")}</span>
+          </div>
+          {["admin", "marketing", "maintenance", "energy"].map(k => (
+            undist[k] > 0 && (
+              <div key={k} className="flex items-center justify-between py-2 px-4 pl-10 text-sm min-w-[600px]">
+                <span className="text-slate-600">{DEPT_LABELS[k] || k}</span>
+                <div className="flex items-center gap-8">
+                  <span className="w-28" />
+                  <span className="w-28 text-right text-red-600">(${fmt(undist[k])})</span>
+                  <span className="w-28" />
+                </div>
               </div>
-            )}
-            {(report?.taxes?.cityTax ?? 0) > 0 && (
-              <div className="flex items-center justify-between py-2 px-4 pl-10 text-sm">
-                <span className="text-slate-600">City Tax</span>
-                <span className="text-slate-700">${fmt(report.taxes.cityTax)}</span>
+            )
+          ))}
+          <div className="flex items-center justify-between py-2 px-4 text-sm border-t border-slate-100 min-w-[600px]">
+            <span className="font-medium text-slate-700">{t("undistributed")}</span>
+            <div className="flex items-center gap-8">
+              <span className="w-28" />
+              <span className="w-28 text-right text-red-600 font-medium">(${fmt(undist.total ?? 0)})</span>
+              <span className="w-28" />
+            </div>
+          </div>
+
+          {/* GOP */}
+          <div className="flex items-center justify-between py-3 px-4 bg-green-50 border-y border-green-100 font-bold min-w-[600px]">
+            <span className="text-green-900">{t("grossProfit")} (GOP)</span>
+            <div className="flex items-center gap-8 text-sm">
+              <span className="w-28" />
+              <span className="w-28" />
+              <span className="w-28 text-right text-green-900 text-base">${fmt(report?.gop ?? 0)}</span>
+            </div>
+          </div>
+
+          {/* Taxes & Fees */}
+          {((report?.taxes?.propertyTax ?? 0) > 0 || (report?.taxes?.cityTax ?? 0) > 0 || (report?.resortFees ?? 0) > 0) && (
+            <>
+              <div className="px-4 pt-3 pb-1">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Taxes & Fees Collected</span>
               </div>
-            )}
-            {(report?.resortFees ?? 0) > 0 && (
-              <div className="flex items-center justify-between py-2 px-4 pl-10 text-sm">
-                <span className="text-slate-600">Resort Fees</span>
-                <span className="text-slate-700">${fmt(report.resortFees)}</span>
-              </div>
-            )}
-          </>
-        )}
+              {(report?.taxes?.propertyTax ?? 0) > 0 && (
+                <div className="flex items-center justify-between py-2 px-4 pl-10 text-sm">
+                  <span className="text-slate-600">Property Tax</span>
+                  <span className="text-slate-700">${fmt(report.taxes.propertyTax)}</span>
+                </div>
+              )}
+              {(report?.taxes?.cityTax ?? 0) > 0 && (
+                <div className="flex items-center justify-between py-2 px-4 pl-10 text-sm">
+                  <span className="text-slate-600">City Tax</span>
+                  <span className="text-slate-700">${fmt(report.taxes.cityTax)}</span>
+                </div>
+              )}
+              {(report?.resortFees ?? 0) > 0 && (
+                <div className="flex items-center justify-between py-2 px-4 pl-10 text-sm">
+                  <span className="text-slate-600">Resort Fees</span>
+                  <span className="text-slate-700">${fmt(report.resortFees)}</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Expense Entry Section */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Department Expenses</h3>
+        <h3 className="font-semibold text-slate-900 mb-4">{t("expenses")}</h3>
 
         {/* Add Expense Form */}
-        <form onSubmit={handleAddExpense} className="flex items-end gap-3 mb-6 pb-6 border-b border-slate-100">
+        <form onSubmit={handleAddExpense} className="flex flex-wrap items-end gap-3 mb-6 pb-6 border-b border-slate-100">
           <div className="flex-shrink-0">
-            <label className="block text-xs text-slate-500 mb-1">Department</label>
+            <label className="block text-xs text-slate-500 mb-1">{t("departmental")}</label>
             <select value={expDept} onChange={e => setExpDept(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
               {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
@@ -308,70 +314,72 @@ function UsaliTab() {
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div className="flex-1">
-            <label className="block text-xs text-slate-500 mb-1">Description</label>
+          <div className="flex-1 min-w-[150px]">
+            <label className="block text-xs text-slate-500 mb-1">{tc("description")}</label>
             <input type="text" value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="e.g. Staff salaries" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required />
           </div>
           <div className="w-32">
-            <label className="block text-xs text-slate-500 mb-1">Amount</label>
+            <label className="block text-xs text-slate-500 mb-1">{tc("amount")}</label>
             <input type="number" step="0.01" min="0" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0.00" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" required />
           </div>
           <button type="submit" disabled={submitting} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
-            {submitting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add
+            {submitting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {tc("add")}
           </button>
         </form>
 
         {/* Filter Dropdowns */}
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-sm text-slate-500">Filter:</span>
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <span className="text-sm text-slate-500">{tc("filter")}:</span>
           <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white">
-            <option value="ALL">All Departments</option>
+            <option value="ALL">{tc("all")}</option>
             {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white">
-            <option value="ALL">All Categories</option>
+            <option value="ALL">{tc("all")}</option>
             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
 
         {/* Expenses Table */}
-        {(() => {
-          const filteredExpenses = expenses.filter((exp: any) => {
-            if (filterDept !== "ALL" && exp.department !== filterDept) return false;
-            if (filterCat !== "ALL" && exp.category !== filterCat) return false;
-            return true;
-          });
-          return filteredExpenses.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 text-sm">No expenses recorded for this month.</div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-xs text-slate-500 border-b border-slate-100 uppercase tracking-wide">
-                  <th className="pb-2 font-medium">Department</th>
-                  <th className="pb-2 font-medium">Category</th>
-                  <th className="pb-2 font-medium">Description</th>
-                  <th className="pb-2 font-medium text-right">Amount</th>
-                  <th className="pb-2 font-medium w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredExpenses.map((exp: any) => (
-                  <tr key={exp.id} className="border-b border-slate-50 hover:bg-slate-50">
-                    <td className="py-2 text-sm font-medium text-slate-700">{exp.department}</td>
-                    <td className="py-2 text-sm text-slate-600">{exp.category}</td>
-                    <td className="py-2 text-sm text-slate-600">{exp.description}</td>
-                    <td className="py-2 text-sm text-right font-medium text-slate-900">${fmt(Number(exp.amount))}</td>
-                    <td className="py-2 text-right">
-                      <button onClick={() => handleDeleteExpense(exp.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1">
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
+        <div className="overflow-x-auto">
+          {(() => {
+            const filteredExpenses = expenses.filter((exp: any) => {
+              if (filterDept !== "ALL" && exp.department !== filterDept) return false;
+              if (filterCat !== "ALL" && exp.category !== filterCat) return false;
+              return true;
+            });
+            return filteredExpenses.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-sm">{tc("noResults")}</div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-xs text-slate-500 border-b border-slate-100 uppercase tracking-wide">
+                    <th className="pb-2 font-medium">{t("departmental")}</th>
+                    <th className="pb-2 font-medium">Category</th>
+                    <th className="pb-2 font-medium">{tc("description")}</th>
+                    <th className="pb-2 font-medium text-right">{tc("amount")}</th>
+                    <th className="pb-2 font-medium w-10"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          );
-        })()}
+                </thead>
+                <tbody>
+                  {filteredExpenses.map((exp: any) => (
+                    <tr key={exp.id} className="border-b border-slate-50 hover:bg-slate-50">
+                      <td className="py-2 text-sm font-medium text-slate-700">{exp.department}</td>
+                      <td className="py-2 text-sm text-slate-600">{exp.category}</td>
+                      <td className="py-2 text-sm text-slate-600">{exp.description}</td>
+                      <td className="py-2 text-sm text-right font-medium text-slate-900">${fmt(Number(exp.amount))}</td>
+                      <td className="py-2 text-right">
+                        <button onClick={() => handleDeleteExpense(exp.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1">
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );
@@ -380,6 +388,9 @@ function UsaliTab() {
 // ─── Main Reports Page ────────────────────────────────────────────────────
 
 export default function ReportsPage() {
+  const t = useTranslations("reports");
+  const tc = useTranslations("common");
+
   const [activeTab, setActiveTab] = useState<"overview" | "usali">("overview");
   const [period, setPeriod] = useState("week");
   const [loading, setLoading] = useState(true);
@@ -486,19 +497,19 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Reports & Analytics</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-slate-500 text-sm mt-1">Performance overview and insights</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Tab Selector */}
           <div className="flex bg-slate-100 rounded-lg p-1">
             <button onClick={() => setActiveTab("overview")} className={`px-3 py-1.5 text-sm rounded-md transition-all ${activeTab === "overview" ? "bg-white text-slate-900 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-              Overview
+              {t("overview")}
             </button>
             <button onClick={() => setActiveTab("usali")} className={`px-3 py-1.5 text-sm rounded-md transition-all ${activeTab === "usali" ? "bg-white text-slate-900 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"}`}>
-              USALI
+              {t("usali")}
             </button>
           </div>
 
@@ -512,8 +523,60 @@ export default function ReportsPage() {
             </div>
           )}
 
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-            <Download size={16} /> Export
+          <button
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            onClick={() => {
+              try {
+                let csvContent = "";
+                if (activeTab === "overview") {
+                  // KPI summary
+                  csvContent += "Metric,Value\n";
+                  csvContent += `Occupancy,${stats.occupancy.toFixed(1)}%\n`;
+                  csvContent += `ADR,$${stats.adr.toFixed(2)}\n`;
+                  csvContent += `RevPAR,$${stats.revpar.toFixed(2)}\n`;
+                  csvContent += `Total Revenue,$${stats.totalRevenue}\n`;
+                  csvContent += `Arrivals Today,${stats.arrivals}\n`;
+                  csvContent += `Departures Today,${stats.departures}\n`;
+                  csvContent += `In-House Guests,${stats.inHouse}\n`;
+                  csvContent += `Rooms Available,${stats.available}\n`;
+                  csvContent += "\n";
+                  // Occupancy daily data
+                  if (occupancyData.length > 0) {
+                    csvContent += "Date,Occupancy %,Revenue\n";
+                    occupancyData.forEach(d => {
+                      csvContent += `${d.date},${d.occupancy},${d.revenue}\n`;
+                    });
+                    csvContent += "\n";
+                  }
+                  // Revenue by source
+                  if (revenueBySource.length > 0) {
+                    csvContent += "Source,Amount,Percentage\n";
+                    revenueBySource.forEach(s => {
+                      csvContent += `${s.source},${s.amount},${s.pct}%\n`;
+                    });
+                    csvContent += "\n";
+                  }
+                  // Room type performance
+                  if (roomTypePerf.length > 0) {
+                    csvContent += "Room Type,Rooms,Occupancy %,ADR,RevPAR\n";
+                    roomTypePerf.forEach(rt => {
+                      csvContent += `${rt.type},${rt.rooms},${rt.occ},${rt.adr},${rt.revpar}\n`;
+                    });
+                  }
+                } else {
+                  csvContent += "Please export USALI data from the USALI tab directly.\n";
+                }
+                const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `report-${activeTab}-${period}-${new Date().toISOString().split("T")[0]}.csv`;
+                link.click();
+                URL.revokeObjectURL(url);
+              } catch (e: any) { alert("Failed to export"); }
+            }}
+          >
+            <Download size={16} /> {tc("export")}
           </button>
         </div>
       </div>
@@ -525,17 +588,17 @@ export default function ReportsPage() {
           {loading ? (
             <div className="flex items-center justify-center h-96">
               <Loader2 className="animate-spin text-blue-500" size={32} />
-              <span className="ml-3 text-slate-500 text-sm">Loading reports...</span>
+              <span className="ml-3 text-slate-500 text-sm">{tc("loading")}</span>
             </div>
           ) : (
             <>
               {/* KPI Cards */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Occupancy", value: `${stats.occupancy.toFixed(1)}%`, icon: BedDouble, color: "blue" },
-                  { label: "ADR", value: `$${stats.adr.toFixed(2)}`, icon: DollarSign, color: "green" },
-                  { label: "RevPAR", value: `$${stats.revpar.toFixed(2)}`, icon: TrendingUp, color: "purple" },
-                  { label: "Total Revenue", value: `$${stats.totalRevenue.toLocaleString()}`, icon: BarChart3, color: "amber" },
+                  { label: t("occupancyRate"), value: `${stats.occupancy.toFixed(1)}%`, icon: BedDouble, color: "blue" },
+                  { label: t("adr"), value: `$${stats.adr.toFixed(2)}`, icon: DollarSign, color: "green" },
+                  { label: t("revpar"), value: `$${stats.revpar.toFixed(2)}`, icon: TrendingUp, color: "purple" },
+                  { label: t("totalRevenue"), value: `$${stats.totalRevenue.toLocaleString()}`, icon: BarChart3, color: "amber" },
                 ].map(kpi => (
                   <div key={kpi.label} className="bg-white rounded-xl border border-slate-200 p-5">
                     <div className="flex items-center justify-between mb-3">
@@ -548,7 +611,7 @@ export default function ReportsPage() {
               </div>
 
               {/* Operations Cards */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { label: "Arrivals Today", value: stats.arrivals, icon: Calendar, color: "bg-blue-50 text-blue-600" },
                   { label: "Departures Today", value: stats.departures, icon: Calendar, color: "bg-amber-50 text-amber-600" },
@@ -567,12 +630,12 @@ export default function ReportsPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Occupancy Chart */}
                 <div className="bg-white rounded-xl border border-slate-200 p-6">
-                  <h3 className="font-semibold text-slate-900 mb-4">Occupancy & Revenue</h3>
+                  <h3 className="font-semibold text-slate-900 mb-4">{t("occupancyTrend")}</h3>
                   {occupancyData.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400 text-sm">No occupancy data available for this period.</div>
+                    <div className="text-center py-12 text-slate-400 text-sm">{tc("noResults")}</div>
                   ) : (
                     <div className="space-y-3">
                       {occupancyData.map((day, i) => (
@@ -591,9 +654,9 @@ export default function ReportsPage() {
 
                 {/* Revenue by Source */}
                 <div className="bg-white rounded-xl border border-slate-200 p-6">
-                  <h3 className="font-semibold text-slate-900 mb-4">Revenue by Source</h3>
+                  <h3 className="font-semibold text-slate-900 mb-4">{t("revenueBySource")}</h3>
                   {revenueBySource.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400 text-sm">No revenue source data available for this period.</div>
+                    <div className="text-center py-12 text-slate-400 text-sm">{tc("noResults")}</div>
                   ) : (
                     <div className="space-y-4">
                       {revenueBySource.map(src => (
@@ -614,36 +677,38 @@ export default function ReportsPage() {
 
               {/* Room Type Performance */}
               <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h3 className="font-semibold text-slate-900 mb-4">Room Type Performance</h3>
+                <h3 className="font-semibold text-slate-900 mb-4">{t("roomTypePerformance")}</h3>
                 {roomTypePerf.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 text-sm">No room type performance data available.</div>
+                  <div className="text-center py-8 text-slate-400 text-sm">{tc("noResults")}</div>
                 ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="text-left text-sm text-slate-500 border-b border-slate-100">
-                        <th className="pb-3 font-medium">Room Type</th>
-                        <th className="pb-3 font-medium text-center">Rooms</th>
-                        <th className="pb-3 font-medium text-center">Occupancy</th>
-                        <th className="pb-3 font-medium text-right">ADR</th>
-                        <th className="pb-3 font-medium text-right">RevPAR</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {roomTypePerf.map(rt => (
-                        <tr key={rt.type} className="border-b border-slate-50 hover:bg-slate-50">
-                          <td className="py-3 font-medium text-slate-900">{rt.type}</td>
-                          <td className="py-3 text-center text-slate-600">{rt.rooms}</td>
-                          <td className="py-3 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${rt.occ >= 80 ? "bg-green-50 text-green-700" : rt.occ >= 60 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
-                              {rt.occ}%
-                            </span>
-                          </td>
-                          <td className="py-3 text-right text-slate-600">${Number(rt.adr).toLocaleString()}</td>
-                          <td className="py-3 text-right font-medium text-slate-900">${Number(rt.revpar).toLocaleString()}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-left text-sm text-slate-500 border-b border-slate-100">
+                          <th className="pb-3 font-medium">{tc("type")}</th>
+                          <th className="pb-3 font-medium text-center">{tc("room")}</th>
+                          <th className="pb-3 font-medium text-center">{t("occupancyRate")}</th>
+                          <th className="pb-3 font-medium text-right">{t("adr")}</th>
+                          <th className="pb-3 font-medium text-right">{t("revpar")}</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {roomTypePerf.map(rt => (
+                          <tr key={rt.type} className="border-b border-slate-50 hover:bg-slate-50">
+                            <td className="py-3 font-medium text-slate-900">{rt.type}</td>
+                            <td className="py-3 text-center text-slate-600">{rt.rooms}</td>
+                            <td className="py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${rt.occ >= 80 ? "bg-green-50 text-green-700" : rt.occ >= 60 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
+                                {rt.occ}%
+                              </span>
+                            </td>
+                            <td className="py-3 text-right text-slate-600">${Number(rt.adr).toLocaleString()}</td>
+                            <td className="py-3 text-right font-medium text-slate-900">${Number(rt.revpar).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </>

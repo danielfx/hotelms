@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { BedDouble, MessageCircle, Wrench, Receipt, Key, Star, LogIn, LogOut, Wifi, Coffee, Car, Dumbbell, CheckCircle, Clock, AlertCircle, Plus, X, ChevronRight, Send } from "lucide-react";
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ const fmtTime = (d: string) => new Date(d).toLocaleTimeString("en-US", { hour: "
 type Tab = "home" | "chat" | "requests" | "folio" | "info";
 
 export default function GuestPortalPage() {
+  const t = useTranslations("portal");
   const [tab, setTab] = useState<Tab>("home");
   const [messages, setMessages] = useState(MOCK_MESSAGES);
   const [newMsg, setNewMsg] = useState("");
@@ -77,10 +79,10 @@ export default function GuestPortalPage() {
   };
 
   const STATUS_CFG: Record<string, { label: string; color: string; icon: any }> = {
-    OPEN:        { label: "Received",    color: "#3B82F6", icon: <Clock size={10} /> },
-    IN_PROGRESS: { label: "In Progress", color: "#F59E0B", icon: <Clock size={10} /> },
-    COMPLETED:   { label: "Completed",   color: "#10B981", icon: <CheckCircle size={10} /> },
-    CANCELLED:   { label: "Cancelled",   color: "#94A3B8", icon: <X size={10} /> },
+    OPEN:        { label: t("received"),          color: "#3B82F6", icon: <Clock size={10} /> },
+    IN_PROGRESS: { label: t("inProgressStatus"),  color: "#F59E0B", icon: <Clock size={10} /> },
+    COMPLETED:   { label: t("completedStatus"),   color: "#10B981", icon: <CheckCircle size={10} /> },
+    CANCELLED:   { label: t("cancelledStatus"),   color: "#94A3B8", icon: <X size={10} /> },
   };
 
   return (
@@ -88,7 +90,7 @@ export default function GuestPortalPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-5 pt-10 pb-6">
         <div className="text-xs font-bold opacity-60 uppercase tracking-widest mb-1">{PROPERTY.name}</div>
-        <h1 className="text-xl font-black mb-0.5">Hello, {GUEST.firstName}! 👋</h1>
+        <h1 className="text-xl font-black mb-0.5">{t("hello", { name: GUEST.firstName })} 👋</h1>
         <div className="text-blue-200 text-xs">Room {RESERVATION.room} · {RESERVATION.roomType}</div>
         <div className="flex gap-2 mt-3">
           <div className="flex-1 bg-white/10 rounded-xl px-3 py-2 text-center">
@@ -100,7 +102,7 @@ export default function GuestPortalPage() {
             <div className="text-sm font-bold">{fmtDate(RESERVATION.checkOut)}</div>
           </div>
           <div className="flex-1 bg-white/10 rounded-xl px-3 py-2 text-center">
-            <div className="text-[10px] text-blue-200">Nights left</div>
+            <div className="text-[10px] text-blue-200">{t("nightsLeft")}</div>
             <div className="text-sm font-bold">{daysLeft}</div>
           </div>
         </div>
@@ -132,7 +134,7 @@ export default function GuestPortalPage() {
             <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5 text-white">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-xs text-slate-400">Digital Room Key</div>
+                  <div className="text-xs text-slate-400">{t("digitalRoomKey")}</div>
                   <div className="text-2xl font-black">Room {RESERVATION.room}</div>
                 </div>
                 <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
@@ -147,7 +149,7 @@ export default function GuestPortalPage() {
 
             {/* Today's info */}
             <div className="bg-white rounded-2xl border border-slate-100 p-4">
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Today at the Hotel</div>
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{t("todayAtHotel")}</div>
               <div className="space-y-2">
                 {PROPERTY.amenities.map(a => (
                   <div key={a} className="flex items-center gap-2 text-xs text-slate-600">
@@ -165,8 +167,8 @@ export default function GuestPortalPage() {
                 {[1,2,3,4,5].map(i => <Star key={i} size={16} className="fill-amber-400 text-amber-400" />)}
               </div>
               <div className="flex-1">
-                <div className="text-sm font-bold text-slate-900">Enjoying your stay?</div>
-                <div className="text-xs text-slate-500">Leave a quick review</div>
+                <div className="text-sm font-bold text-slate-900">{t("enjoyingStay")}</div>
+                <div className="text-xs text-slate-500">{t("leaveReview")}</div>
               </div>
               <ChevronRight size={16} className="text-slate-400" />
             </button>
@@ -176,7 +178,7 @@ export default function GuestPortalPage() {
         {/* CHAT */}
         {tab === "chat" && (
           <div className="flex flex-col" style={{ height: "calc(100vh - 260px)" }}>
-            <div className="text-sm font-bold text-slate-900 mb-3">Chat with Hotel Staff</div>
+            <div className="text-sm font-bold text-slate-900 mb-3">{t("chatWithStaff")}</div>
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
               {messages.map(m => (
                 <div key={m.id} className={`flex ${m.direction === "INBOUND" ? "justify-end" : "justify-start"}`}>
@@ -190,7 +192,7 @@ export default function GuestPortalPage() {
             <div className="flex gap-2 pt-3">
               <input value={newMsg} onChange={e => setNewMsg(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && sendMessage()}
-                placeholder="Type a message…"
+                placeholder={t("typeMessage")}
                 className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
               <button onClick={sendMessage} disabled={!newMsg.trim()}
                 className="w-10 h-10 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-200 rounded-2xl flex items-center justify-center transition-colors">
@@ -204,14 +206,14 @@ export default function GuestPortalPage() {
         {tab === "requests" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-bold text-slate-900">Service Requests</div>
+              <div className="text-sm font-bold text-slate-900">{t("serviceRequests")}</div>
               <button onClick={() => setShowRequestModal(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold">
                 <Plus size={12} /> New
               </button>
             </div>
             {requests.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 text-sm">No requests yet</div>
+              <div className="text-center py-12 text-slate-400 text-sm">{t("noRequests")}</div>
             ) : (
               <div className="space-y-2">
                 {requests.map(r => {
@@ -238,7 +240,7 @@ export default function GuestPortalPage() {
         {/* FOLIO */}
         {tab === "folio" && (
           <div className="space-y-4">
-            <div className="text-sm font-bold text-slate-900">Your Bill</div>
+            <div className="text-sm font-bold text-slate-900">{t("yourBill")}</div>
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
               {FOLIO_CHARGES.map((c, i) => (
                 <div key={c.id} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-slate-50" : ""}`}>
@@ -257,7 +259,7 @@ export default function GuestPortalPage() {
             </div>
             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-xs text-emerald-700 flex items-center gap-2">
               <CheckCircle size={14} />
-              Your bill is fully paid. No outstanding balance.
+              {t("billPaid")}
             </div>
           </div>
         )}
@@ -265,7 +267,7 @@ export default function GuestPortalPage() {
         {/* INFO */}
         {tab === "info" && (
           <div className="space-y-4">
-            <div className="text-sm font-bold text-slate-900">Hotel Information</div>
+            <div className="text-sm font-bold text-slate-900">{t("hotelInfo")}</div>
             <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">
               {[
                 ["📞 Phone", PROPERTY.phone],
@@ -300,7 +302,7 @@ export default function GuestPortalPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
           <div className="bg-white rounded-t-3xl w-full max-w-sm mx-auto p-5 pb-8 space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-slate-900">What do you need?</h3>
+              <h3 className="font-bold text-slate-900">{t("whatDoYouNeed")}</h3>
               <button onClick={() => { setShowRequestModal(false); setSelectedService(null); setRequestNote(""); }}>
                 <X size={18} className="text-slate-400" />
               </button>
@@ -323,11 +325,11 @@ export default function GuestPortalPage() {
                   <button onClick={() => setSelectedService(null)} className="ml-auto text-slate-400"><X size={14} /></button>
                 </div>
                 <textarea value={requestNote} onChange={e => setRequestNote(e.target.value)} rows={3}
-                  placeholder="Any additional details? (optional)"
+                  placeholder={t("additionalDetails")}
                   className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                 <button onClick={submitRequest}
                   className="w-full py-3 bg-blue-600 text-white rounded-2xl font-bold text-sm">
-                  Send Request
+                  {t("sendRequest")}
                 </button>
               </div>
             )}
@@ -340,7 +342,7 @@ export default function GuestPortalPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
           <div className="bg-white rounded-t-3xl w-full max-w-sm mx-auto p-5 pb-8 space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-slate-900">Rate Your Stay</h3>
+              <h3 className="font-bold text-slate-900">{t("rateYourStay")}</h3>
               <button onClick={() => setShowReview(false)}><X size={18} className="text-slate-400" /></button>
             </div>
             <div className="flex justify-center gap-3">
@@ -350,11 +352,11 @@ export default function GuestPortalPage() {
                 </button>
               ))}
             </div>
-            <textarea rows={3} placeholder="Tell us about your experience…"
+            <textarea rows={3} placeholder={t("tellExperience")}
               className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400" />
             <button onClick={() => setShowReview(false)} disabled={rating === 0}
               className="w-full py-3 bg-amber-400 hover:bg-amber-500 disabled:bg-slate-200 text-white rounded-2xl font-bold text-sm transition-colors">
-              Submit Review
+              {t("submitReview")}
             </button>
           </div>
         </div>

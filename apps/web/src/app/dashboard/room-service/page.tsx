@@ -4,9 +4,10 @@ import {
   Coffee, Clock, DollarSign, ChefHat, Plus, X, Minus,
   Check, Truck, Ban, RefreshCw, ShoppingCart, AlertCircle
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import api from "@/lib/api";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ---- Types -----------------------------------------------------------------
 
 type Tab = "orders" | "menu" | "new-order";
 type OrderStatus = "PENDING" | "CONFIRMED" | "PREPARING" | "READY" | "DELIVERING" | "DELIVERED" | "CANCELLED";
@@ -39,34 +40,61 @@ interface Stats {
   popularItems: { menuItemId: string; name: string; quantity: number }[];
 }
 
-// ─── Config ─────────────────────────────────────────────────────────────────
+// ---- Color configs (no labels - labels come from translations) -------------
 
-const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string }> = {
-  PENDING:    { label: "Pending",    color: "#F59E0B", bg: "#FFFBEB" },
-  CONFIRMED:  { label: "Confirmed",  color: "#3B82F6", bg: "#EFF6FF" },
-  PREPARING:  { label: "Preparing",  color: "#8B5CF6", bg: "#F5F3FF" },
-  READY:      { label: "Ready",      color: "#10B981", bg: "#ECFDF5" },
-  DELIVERING: { label: "Delivering", color: "#0EA5E9", bg: "#F0F9FF" },
-  DELIVERED:  { label: "Delivered",  color: "#6B7280", bg: "#F9FAFB" },
-  CANCELLED:  { label: "Cancelled",  color: "#EF4444", bg: "#FEF2F2" },
+const STATUS_COLORS: Record<OrderStatus, { color: string; bg: string }> = {
+  PENDING:    { color: "#F59E0B", bg: "#FFFBEB" },
+  CONFIRMED:  { color: "#3B82F6", bg: "#EFF6FF" },
+  PREPARING:  { color: "#8B5CF6", bg: "#F5F3FF" },
+  READY:      { color: "#10B981", bg: "#ECFDF5" },
+  DELIVERING: { color: "#0EA5E9", bg: "#F0F9FF" },
+  DELIVERED:  { color: "#6B7280", bg: "#F9FAFB" },
+  CANCELLED:  { color: "#EF4444", bg: "#FEF2F2" },
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  BREAKFAST: "Breakfast", APPETIZER: "Appetizer", MAIN_COURSE: "Main Course",
-  DESSERT: "Dessert", BEVERAGE: "Beverage", SNACK: "Snack", COMBO: "Combo",
+const STATUS_ACTIONS: Record<string, { next: string; icon: any }> = {
+  PENDING:    { next: "CONFIRMED",  icon: Check },
+  CONFIRMED:  { next: "PREPARING",  icon: ChefHat },
+  PREPARING:  { next: "READY",      icon: Check },
+  READY:      { next: "DELIVERING", icon: Truck },
+  DELIVERING: { next: "DELIVERED",  icon: Check },
 };
 
-const STATUS_ACTIONS: Record<string, { next: string; label: string; icon: any }> = {
-  PENDING:    { next: "CONFIRMED",  label: "Confirm",          icon: Check },
-  CONFIRMED:  { next: "PREPARING",  label: "Start Preparing",  icon: ChefHat },
-  PREPARING:  { next: "READY",      label: "Mark Ready",       icon: Check },
-  READY:      { next: "DELIVERING", label: "Out for Delivery",  icon: Truck },
-  DELIVERING: { next: "DELIVERED",  label: "Delivered",         icon: Check },
-};
-
-// ─── Page ───────────────────────────────────────────────────────────────────
+// ---- Page ------------------------------------------------------------------
 
 export default function RoomServicePage() {
+  const t = useTranslations("roomService");
+  const tc = useTranslations("common");
+
+  /* Translated lookup maps */
+  const STATUS_LABELS: Record<string, string> = {
+    PENDING:    t("received"),
+    CONFIRMED:  t("received"),
+    PREPARING:  t("preparing"),
+    READY:      t("delivering"),
+    DELIVERING: t("delivering"),
+    DELIVERED:  t("delivered"),
+    CANCELLED:  t("cancelledOrder"),
+  };
+
+  const STATUS_ACTION_LABELS: Record<string, string> = {
+    PENDING:    tc("confirm"),
+    CONFIRMED:  t("preparing"),
+    PREPARING:  t("delivering"),
+    READY:      t("delivering"),
+    DELIVERING: t("delivered"),
+  };
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    BREAKFAST:    t("breakfast"),
+    APPETIZER:    t("breakfast"),
+    MAIN_COURSE:  t("lunch"),
+    DESSERT:      t("desserts"),
+    BEVERAGE:     t("drinks"),
+    SNACK:        t("snacks"),
+    COMBO:        t("lunch"),
+  };
+
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -90,7 +118,7 @@ export default function RoomServicePage() {
   const [orderNotes, setOrderNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // ─── Data Loading ──────────────────────────────────────────────────────────
+  // ---- Data Loading --------------------------------------------------------
 
   const loadOrders = useCallback(async () => {
     try {
@@ -137,7 +165,7 @@ export default function RoomServicePage() {
     return () => clearInterval(interval);
   }, [tab, loadOrders, loadStats]);
 
-  // ─── Handlers ──────────────────────────────────────────────────────────────
+  // ---- Handlers ------------------------------------------------------------
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
@@ -198,7 +226,7 @@ export default function RoomServicePage() {
 
   const cartItemCount = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // ─── Elapsed time helper ───────────────────────────────────────────────────
+  // ---- Elapsed time helper -------------------------------------------------
 
   const elapsed = (dateStr: string) => {
     const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
@@ -206,7 +234,7 @@ export default function RoomServicePage() {
     return `${Math.floor(mins / 60)}h ${mins % 60}m`;
   };
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  // ---- Render --------------------------------------------------------------
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -215,7 +243,7 @@ export default function RoomServicePage() {
   );
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2">
           <AlertCircle size={16} /> {error}
@@ -223,37 +251,37 @@ export default function RoomServicePage() {
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+      <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 w-fit flex-wrap">
         {([
-          { key: "orders", label: "Orders", icon: Coffee },
-          { key: "menu", label: "Menu", icon: ChefHat },
-          { key: "new-order", label: "New Order", icon: ShoppingCart },
-        ] as const).map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
+          { key: "orders", label: t("orders"), icon: Coffee },
+          { key: "menu", label: t("menu"), icon: ChefHat },
+          { key: "new-order", label: t("newOrder"), icon: ShoppingCart },
+        ] as const).map(tabItem => (
+          <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              tab === t.key ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              tab === tabItem.key ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
             }`}>
-            <t.icon size={15} /> {t.label}
-            {t.key === "new-order" && cartItemCount > 0 && (
+            <tabItem.icon size={15} /> {tabItem.label}
+            {tabItem.key === "new-order" && cartItemCount > 0 && (
               <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cartItemCount}</span>
             )}
           </button>
         ))}
       </div>
 
-      {/* ═══ ORDERS TAB ═══ */}
+      {/* === ORDERS TAB === */}
       {tab === "orders" && (
         <div className="space-y-6">
           {/* KPI Cards */}
           {stats && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: "Active Orders", value: stats.activeOrders, icon: Coffee, color: "blue" },
-                { label: "Today's Revenue", value: `$${stats.todayRevenue.toFixed(2)}`, icon: DollarSign, color: "green" },
-                { label: "Avg Delivery", value: stats.avgDeliveryTime > 0 ? `${stats.avgDeliveryTime}m` : "N/A", icon: Clock, color: "amber" },
-                { label: "Orders Today", value: stats.itemsServed, icon: ChefHat, color: "purple" },
-              ].map(kpi => (
-                <div key={kpi.label} className="bg-white rounded-2xl border border-slate-100 p-5">
+                { label: t("orders"), value: stats.activeOrders, icon: Coffee, color: "blue" },
+                { label: tc("total"), value: `$${stats.todayRevenue.toFixed(2)}`, icon: DollarSign, color: "green" },
+                { label: t("delivering"), value: stats.avgDeliveryTime > 0 ? `${stats.avgDeliveryTime}m` : "N/A", icon: Clock, color: "amber" },
+                { label: t("orders"), value: stats.itemsServed, icon: ChefHat, color: "purple" },
+              ].map((kpi, idx) => (
+                <div key={idx} className="bg-white rounded-2xl border border-slate-100 p-5">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{kpi.label}</span>
                     <div className={`w-8 h-8 rounded-lg bg-${kpi.color}-50 flex items-center justify-center`}>
@@ -275,7 +303,7 @@ export default function RoomServicePage() {
                     ? "bg-blue-500 text-white"
                     : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}>
-                {s === "all" ? "All" : STATUS_CFG[s as OrderStatus]?.label ?? s}
+                {s === "all" ? tc("all") : STATUS_LABELS[s] ?? s}
               </button>
             ))}
             <button onClick={() => { loadOrders(); loadStats(); }}
@@ -288,13 +316,15 @@ export default function RoomServicePage() {
           {orders.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
               <Coffee size={40} className="mx-auto text-slate-300 mb-3" />
-              <p className="text-slate-400 text-sm">No orders found</p>
+              <p className="text-slate-400 text-sm">{t("noOrders")}</p>
             </div>
           ) : (
             <div className="space-y-3">
               {orders.map(order => {
-                const cfg = STATUS_CFG[order.status];
+                const cfg = STATUS_COLORS[order.status];
                 const action = STATUS_ACTIONS[order.status];
+                const statusLabel = STATUS_LABELS[order.status] ?? order.status;
+                const actionLabel = STATUS_ACTION_LABELS[order.status] ?? order.status;
                 const isExpanded = expandedOrder === order.id;
 
                 return (
@@ -304,7 +334,7 @@ export default function RoomServicePage() {
                       className="w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-slate-50 transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-slate-800">Room {order.room.number}</span>
+                          <span className="font-bold text-slate-800">{tc("room")} {order.room.number}</span>
                           <span className="text-xs text-slate-400">|</span>
                           <span className="text-sm text-slate-600">{order.guest.firstName} {order.guest.lastName}</span>
                         </div>
@@ -316,7 +346,7 @@ export default function RoomServicePage() {
                         <div className="text-sm font-bold text-slate-800">${Number(order.totalAmount).toFixed(2)}</div>
                         <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider mt-1"
                           style={{ color: cfg.color, backgroundColor: cfg.bg }}>
-                          {cfg.label}
+                          {statusLabel}
                         </span>
                       </div>
                     </button>
@@ -341,7 +371,7 @@ export default function RoomServicePage() {
 
                           {order.specialInstructions && (
                             <div className="text-xs text-slate-500 bg-amber-50 rounded-lg p-3">
-                              <strong>Notes:</strong> {order.specialInstructions}
+                              <strong>{tc("notes")}:</strong> {order.specialInstructions}
                             </div>
                           )}
 
@@ -356,13 +386,13 @@ export default function RoomServicePage() {
                             {action && (
                               <button onClick={() => handleStatusChange(order.id, action.next)}
                                 className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-xl text-xs font-semibold hover:bg-blue-600 transition-colors">
-                                <action.icon size={13} /> {action.label}
+                                <action.icon size={13} /> {actionLabel}
                               </button>
                             )}
                             {["PENDING", "CONFIRMED", "PREPARING"].includes(order.status) && (
                               <button onClick={() => handleStatusChange(order.id, "CANCELLED")}
                                 className="flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-100 transition-colors">
-                                <Ban size={13} /> Cancel
+                                <Ban size={13} /> {tc("cancel")}
                               </button>
                             )}
                           </div>
@@ -377,7 +407,7 @@ export default function RoomServicePage() {
         </div>
       )}
 
-      {/* ═══ MENU TAB ═══ */}
+      {/* === MENU TAB === */}
       {tab === "menu" && (
         <div className="space-y-6">
           {/* Category tabs + Add button */}
@@ -390,18 +420,18 @@ export default function RoomServicePage() {
                       ? "bg-blue-500 text-white"
                       : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
                   }`}>
-                  {cat === "all" ? "All" : CATEGORY_LABELS[cat] ?? cat}
+                  {cat === "all" ? tc("all") : CATEGORY_LABELS[cat] ?? cat}
                 </button>
               ))}
             </div>
             <button onClick={() => { setEditingItem(null); setShowMenuModal(true); }}
               className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-xl text-xs font-semibold hover:bg-blue-600 transition-colors">
-              <Plus size={13} /> Add Item
+              <Plus size={13} /> {t("addItem")}
             </button>
           </div>
 
           {/* Menu grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {menuItems
               .filter(m => menuCategory === "all" || m.category === menuCategory)
               .map(item => (
@@ -436,9 +466,9 @@ export default function RoomServicePage() {
                         }`} />
                       </button>
                       <button onClick={() => { setEditingItem(item); setShowMenuModal(true); }}
-                        className="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit</button>
+                        className="text-xs text-blue-500 hover:text-blue-700 font-medium">{tc("edit")}</button>
                       <button onClick={() => handleDeleteMenuItem(item.id)}
-                        className="text-xs text-red-400 hover:text-red-600 font-medium">Delete</button>
+                        className="text-xs text-red-400 hover:text-red-600 font-medium">{tc("delete")}</button>
                     </div>
                   </div>
                 </div>
@@ -447,20 +477,20 @@ export default function RoomServicePage() {
         </div>
       )}
 
-      {/* ═══ NEW ORDER TAB ═══ */}
+      {/* === NEW ORDER TAB === */}
       {tab === "new-order" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left: Menu items */}
           <div className="lg:col-span-2 space-y-6">
             {/* Room selector */}
             <div className="bg-white rounded-2xl border border-slate-100 p-5">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Select Room</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{tc("room")}</label>
               <select value={selectedReservation} onChange={e => setSelectedReservation(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 <option value="">-- Select an occupied room --</option>
                 {occupiedRooms.map((r: any) => (
                   <option key={r.id} value={r.id}>
-                    Room {r.room?.number ?? r.roomNumber ?? "?"} &mdash; {r.guest?.firstName ?? ""} {r.guest?.lastName ?? ""}
+                    {tc("room")} {r.room?.number ?? r.roomNumber ?? "?"} &mdash; {r.guest?.firstName ?? ""} {r.guest?.lastName ?? ""}
                   </option>
                 ))}
               </select>
@@ -509,11 +539,11 @@ export default function RoomServicePage() {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl border border-slate-100 p-5 sticky top-6">
               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <ShoppingCart size={16} /> Order Summary
+                <ShoppingCart size={16} /> {t("orderSummary")}
               </h3>
 
               {Object.keys(cart).length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">No items added yet</p>
+                <p className="text-sm text-slate-400 text-center py-8">{t("noOrders")}</p>
               ) : (
                 <div className="space-y-3 mb-4">
                   {Object.entries(cart).map(([id, qty]) => {
@@ -539,13 +569,13 @@ export default function RoomServicePage() {
                   <span className="font-medium">${(cartTotal * 0.07).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-slate-800 mt-2">
-                  <span>Total</span>
+                  <span>{t("orderTotal")}</span>
                   <span>${(cartTotal * 1.07).toFixed(2)}</span>
                 </div>
               </div>
 
               <textarea
-                placeholder="Special instructions..."
+                placeholder={`${tc("notes")}...`}
                 value={orderNotes}
                 onChange={e => setOrderNotes(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mb-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
@@ -556,14 +586,14 @@ export default function RoomServicePage() {
                 disabled={submitting || !selectedReservation || Object.keys(cart).length === 0}
                 className="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold text-sm hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
                 {submitting ? <RefreshCw size={14} className="animate-spin" /> : <Coffee size={14} />}
-                Place Order
+                {t("placeOrder")}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ═══ MENU ITEM MODAL ═══ */}
+      {/* === MENU ITEM MODAL === */}
       {showMenuModal && (
         <MenuItemModal
           item={editingItem}
@@ -575,11 +605,24 @@ export default function RoomServicePage() {
   );
 }
 
-// ─── Menu Item Modal Component ──────────────────────────────────────────────
+// ---- Menu Item Modal Component ---------------------------------------------
 
 function MenuItemModal({ item, onClose, onSaved }: {
   item: MenuItem | null; onClose: () => void; onSaved: () => void;
 }) {
+  const t = useTranslations("roomService");
+  const tc = useTranslations("common");
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    BREAKFAST:    t("breakfast"),
+    APPETIZER:    t("breakfast"),
+    MAIN_COURSE:  t("lunch"),
+    DESSERT:      t("desserts"),
+    BEVERAGE:     t("drinks"),
+    SNACK:        t("snacks"),
+    COMBO:        t("lunch"),
+  };
+
   const [form, setForm] = useState({
     name: item?.name ?? "",
     category: item?.category ?? "MAIN_COURSE",
@@ -616,38 +659,38 @@ function MenuItemModal({ item, onClose, onSaved }: {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-bold text-slate-800">{item ? "Edit Menu Item" : "Add Menu Item"}</h2>
+          <h2 className="font-bold text-slate-800">{item ? `${tc("edit")} ${t("menu")}` : `${tc("add")} ${t("menu")}`}</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
             <X size={16} />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Name</label>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">{tc("name")}</label>
             <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Category</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">{t("category")}</label>
               <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Price ($)</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">{t("price")} ($)</label>
               <input type="number" step="0.01" min="0" required value={form.price}
                 onChange={e => setForm({ ...form, price: e.target.value })}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Description</label>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">{tc("description")}</label>
             <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" rows={2} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Prep Time (min)</label>
               <input type="number" min="1" value={form.prepTime} onChange={e => setForm({ ...form, prepTime: e.target.value })}
@@ -662,10 +705,10 @@ function MenuItemModal({ item, onClose, onSaved }: {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+              className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">{tc("cancel")}</button>
             <button type="submit" disabled={saving}
               className="px-6 py-2 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 disabled:opacity-50 transition-colors">
-              {saving ? "Saving..." : item ? "Update" : "Create"}
+              {saving ? tc("saving") : item ? tc("update") : tc("create")}
             </button>
           </div>
         </form>

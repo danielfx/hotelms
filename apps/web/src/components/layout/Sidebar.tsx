@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   LayoutDashboard, BedDouble, CalendarDays, BookMarked,
   Sparkles, Users, DollarSign, Globe, CreditCard,
@@ -9,51 +10,61 @@ import {
   Shield, HelpCircle, Receipt, TrendingUp, Coffee
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useHotelStore } from "@/store/hotel.store";
 
-const NAV = [
-  { href: "/dashboard",                   icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/dashboard/reservations",      icon: BookMarked,      label: "Reservations" },
-  { href: "/dashboard/checkin",           icon: CalendarDays,    label: "Check-In Today" },
-  { href: "/dashboard/rooms",             icon: BedDouble,       label: "Rooms" },
-  { href: "/dashboard/guests",            icon: Users,           label: "Guests" },
-  { href: "/dashboard/folio",             icon: DollarSign,      label: "Folio / Billing" },
-  { href: "/dashboard/rates",             icon: DollarSign,      label: "Rate Plans" },
-  { href: "/dashboard/channels",          icon: Globe,           label: "Channels (OTA)" },
-  { href: "/dashboard/housekeeping",      icon: Sparkles,        label: "Housekeeping" },
-  { href: "/dashboard/room-service",     icon: Coffee,          label: "Room Service" },
-  { href: "/dashboard/communications",    icon: MessageCircle,   label: "Communications" },
-  { href: "/dashboard/reports",            icon: BarChart3,       label: "Reports" },
-  { href: "/dashboard/groups",             icon: UsersRound,      label: "Groups & Events" },
-  { href: "/dashboard/crm",               icon: Heart,           label: "CRM" },
-  { href: "/dashboard/revenue",            icon: TrendingUp,      label: "Revenue Intel" },
-  { href: "/dashboard/reputation",         icon: Sparkles,        label: "Reputation" },
-  { href: "/dashboard/portfolio",          icon: Building2,       label: "Portfolio" },
-  { href: "/dashboard/marketplace",        icon: Puzzle,          label: "Marketplace" },
-  { href: "/dashboard/audit",              icon: Shield,          label: "Audit & Security" },
-  { href: "/dashboard/billing",            icon: Receipt,         label: "Billing" },
-  { href: "/dashboard/settings",           icon: Settings,        label: "Settings" },
-  { href: "/dashboard/help",              icon: HelpCircle,      label: "Help" },
-];
+const NAV_KEYS = [
+  { href: "/dashboard",              icon: LayoutDashboard, key: "dashboard" },
+  { href: "/dashboard/reservations", icon: BookMarked,      key: "reservations" },
+  { href: "/dashboard/checkin",      icon: CalendarDays,    key: "checkInToday" },
+  { href: "/dashboard/rooms",        icon: BedDouble,       key: "rooms" },
+  { href: "/dashboard/guests",       icon: Users,           key: "guests" },
+  { href: "/dashboard/folio",        icon: DollarSign,      key: "folioBilling" },
+  { href: "/dashboard/rates",        icon: DollarSign,      key: "ratePlans" },
+  { href: "/dashboard/channels",     icon: Globe,           key: "channels" },
+  { href: "/dashboard/housekeeping", icon: Sparkles,        key: "housekeeping" },
+  { href: "/dashboard/room-service", icon: Coffee,          key: "roomService" },
+  { href: "/dashboard/communications", icon: MessageCircle, key: "communications" },
+  { href: "/dashboard/reports",      icon: BarChart3,       key: "reports" },
+  { href: "/dashboard/groups",       icon: UsersRound,      key: "groupsEvents" },
+  { href: "/dashboard/crm",         icon: Heart,           key: "crm" },
+  { href: "/dashboard/revenue",      icon: TrendingUp,      key: "revenueIntel" },
+  { href: "/dashboard/reputation",   icon: Sparkles,        key: "reputation" },
+  { href: "/dashboard/portfolio",    icon: Building2,       key: "portfolio" },
+  { href: "/dashboard/marketplace",  icon: Puzzle,          key: "marketplace" },
+  { href: "/dashboard/audit",        icon: Shield,          key: "auditSecurity" },
+  { href: "/dashboard/billing",      icon: Receipt,         key: "billing" },
+  { href: "/dashboard/settings",     icon: Settings,        key: "settings" },
+  { href: "/dashboard/help",        icon: HelpCircle,      key: "help" },
+] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
+  const closeSidebar = useHotelStore((s) => s.closeSidebar);
+  const sidebarOpen = useHotelStore((s) => s.sidebarOpen);
 
   return (
-    <aside className="w-56 bg-[#0F172A] flex flex-col shrink-0 min-h-screen">
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-40 w-56 bg-[#0F172A] flex flex-col shrink-0 transform transition-transform duration-200 ease-in-out",
+        "md:relative md:translate-x-0",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}
+    >
       {/* Logo */}
       <div className="px-5 pt-6 pb-4">
         <div className="text-lg font-extrabold text-white tracking-tight">
           <span className="text-blue-400">Hotel</span>MS
         </div>
-        <div className="text-[11px] text-slate-500 mt-0.5">Property Management</div>
+        <div className="text-[11px] text-slate-500 mt-0.5">{t("propertyManagement")}</div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ href, icon: Icon, label }) => {
+        {NAV_KEYS.map(({ href, icon: Icon, key }) => {
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
-            <Link key={href} href={href}
+            <Link key={href} href={href} onClick={closeSidebar}
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group",
                 active
@@ -61,7 +72,7 @@ export function Sidebar() {
                   : "text-slate-500 hover:text-slate-200 hover:bg-white/5"
               )}>
               <Icon size={15} className={cn(active ? "text-blue-400" : "text-slate-600 group-hover:text-slate-300")} />
-              <span className="text-xs">{label}</span>
+              <span className="text-xs">{t(key)}</span>
               {active && <ChevronRight size={10} className="ml-auto text-blue-400/50" />}
             </Link>
           );
@@ -70,14 +81,14 @@ export function Sidebar() {
 
       {/* Public links */}
       <div className="px-2 py-3 border-t border-white/5">
-        <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-3 mb-2">Public</div>
-        <Link href="/book" target="_blank"
+        <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-3 mb-2">{t("public")}</div>
+        <Link href="/book" target="_blank" onClick={closeSidebar}
           className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all">
-          <Globe size={13} /> Booking Engine
+          <Globe size={13} /> {t("bookingEngine")}
         </Link>
-        <Link href="/portal" target="_blank"
+        <Link href="/portal" target="_blank" onClick={closeSidebar}
           className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-all">
-          <Home size={13} /> Guest Portal
+          <Home size={13} /> {t("guestPortal")}
         </Link>
       </div>
 
