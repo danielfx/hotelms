@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
+    />
+    <title>WORD CRUSH — Prototype</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="wc-app">
+    <div id="wc-fx" class="wc-fx-layer" aria-hidden="true"></div>
+
+    <header class="wc-top">
+      <div class="wc-nav-row">
+        <button type="button" class="wc-icon-btn" id="wc-back" aria-label="Back">
+          ←
+        </button>
+        <div class="wc-level-badge" id="wc-level-wrap">
+          <span class="wc-level-label">Level</span>
+          <span class="wc-level-num" id="wc-level">1</span>
+        </div>
+        <button type="button" class="wc-icon-btn" id="wc-settings" aria-label="Settings">
+          ⚙
+        </button>
+      </div>
+
+      <div class="wc-stats-row">
+        <div class="wc-stat">
+          <span class="wc-stat-k">Moves</span>
+          <span class="wc-stat-v" id="wc-moves">0</span>
+        </div>
+        <div class="wc-stat">
+          <span class="wc-stat-k">Goal</span>
+          <span class="wc-stat-v" id="wc-goal">0</span>
+        </div>
+        <div class="wc-stat">
+          <span class="wc-stat-k">Score</span>
+          <span class="wc-stat-v" id="wc-score">0</span>
+        </div>
+        <div class="wc-stat wc-stat-long">
+          <span class="wc-stat-k">LONG</span>
+          <span class="wc-stat-v" id="wc-long">0</span>
+        </div>
+      </div>
+
+      <div class="wc-star-row">
+        <div class="wc-star-bar">
+          <div class="wc-star-bar-track">
+            <div class="wc-star-bar-fill" id="wc-star-fill"></div>
+          </div>
+          <div class="wc-star-markers">
+            <span class="wc-th" id="wc-th-1">1500</span>
+            <span class="wc-th" id="wc-th-2">3000</span>
+            <span class="wc-th" id="wc-th-3">4800</span>
+          </div>
+        </div>
+        <div class="wc-stars" aria-hidden="true">
+          <span class="wc-star wc-star-off" id="wc-star-1">★</span>
+          <span class="wc-star wc-star-off" id="wc-star-2">★</span>
+          <span class="wc-star wc-star-off" id="wc-star-3">★</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="wc-main">
+      <p class="wc-toast" id="wc-toast" role="status"></p>
+      <div class="wc-board-wrap">
+        <div class="wc-board" id="wc-board" role="grid" aria-label="Letter board"></div>
+      </div>
+
+      <div class="wc-mode-row">
+        <span class="wc-mode-label">Move mode</span>
+        <div class="wc-segmented" role="group" aria-label="Move mode">
+          <button type="button" class="wc-seg" id="wc-mode-short">SHORT</button>
+          <button type="button" class="wc-seg" id="wc-mode-long">LONG</button>
+        </div>
+      </div>
+
+      <div class="wc-boosters">
+        <button type="button" class="wc-boost" id="wc-booster-hint">
+          <span class="wc-boost-ic">?</span>
+          <span class="wc-boost-tx">Hint</span>
+        </button>
+        <button type="button" class="wc-boost" id="wc-booster-shuffle">
+          <span class="wc-boost-ic">↻</span>
+          <span class="wc-boost-tx">Shuffle</span>
+        </button>
+        <button type="button" class="wc-boost" id="wc-booster-hammer">
+          <span class="wc-boost-ic">⌁</span>
+          <span class="wc-boost-tx">Hammer</span>
+        </button>
+        <button type="button" class="wc-boost" id="wc-booster-bomb">
+          <span class="wc-boost-ic">◉</span>
+          <span class="wc-boost-tx">Bomb</span>
+        </button>
+      </div>
+
+      <p class="wc-foot">
+        <button type="button" class="wc-text-btn" id="wc-restart">New board</button>
+      </p>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="dictionary.js"></script>
+    <script src="board.js"></script>
+    <script src="game.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>
