@@ -1,0 +1,10 @@
+{
+  "install": "cd rarecandy && npm install",
+  "start": "cd rarecandy && rm -rf .next && npm run build && npm run start -- -p 3000",
+  "terminals": [
+    {
+      "name": "rarecandy-dev",
+      "command": "cd rarecandy && rm -rf .next && npm run dev -- -p 3000"
+    }
+  ]
+}

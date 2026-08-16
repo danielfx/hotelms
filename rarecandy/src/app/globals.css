@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-ink: #0c0c0e;
+  --color-ink-muted: #5c5c66;
+  --color-ink-faint: #9494a0;
+  --color-cream: #f7f4ef;
+  --color-cream-dark: #ebe6de;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #fafaf8;
+  --color-border: #e4e0d8;
+  --color-border-strong: #ccc7bc;
+  --color-accent: #b8860b;
+  --color-accent-hover: #9a7209;
+  --color-accent-muted: #d4a843;
+  --color-success: #1a7f4b;
+  --color-danger: #c0392b;
+  --color-psa: #c8102e;
+  --color-bgs: #003087;
+  --color-cgc: #0066b3;
+  --font-display: var(--font-instrument-serif);
+  --font-body: var(--font-dm-sans);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out forwards;
+}
+
+.animate-fade-up-delay-1 { animation-delay: 0.1s; opacity: 0; }
+.animate-fade-up-delay-2 { animation-delay: 0.2s; opacity: 0; }
+.animate-fade-up-delay-3 { animation-delay: 0.3s; opacity: 0; }
+
+.card-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.08) 45%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.08) 55%,
+    transparent 60%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.card-shine:hover::after {
+  transform: translateX(100%);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.price-chart-tooltip {
+  background: var(--color-ink) !important;
+  border: none !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+}
