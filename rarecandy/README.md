@@ -23,6 +23,8 @@ Premium Pokémon card marketplace — a demo web app with mock inventory, market
 
 ## Quick Start
 
+**Important:** the app lives in the `rarecandy/` folder (not the repo root).
+
 ```bash
 cd rarecandy
 npm install
@@ -30,6 +32,24 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
+
+If you see errors about `.next` or port 3000 in use:
+
+```bash
+cd rarecandy
+pkill -f "next dev" || true
+pkill -f "next start" || true
+rm -rf .next
+npm run dev
+```
+
+Production mode (more stable):
+
+```bash
+cd rarecandy
+npm run build
+npm run start
+```
 
 ## Scripts
 
