@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { CardVisual } from "@/components/card/CardVisual";
 import { getListing } from "@/lib/data";
 import { money } from "@/lib/format";
@@ -12,13 +13,29 @@ export default function BagPage() {
   const remove = useStore((s) => s.removeFromCart);
   const clear = useStore((s) => s.clearCart);
   const totals = cartTotals(cart);
+  const [closed, setClosed] = useState(false);
+
+  function closeTicket() {
+    setClosed(true);
+    clear();
+  }
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-10 sm:px-6">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-candy">Checkout rail</p>
       <h1 className="display mt-2 text-5xl font-semibold uppercase">Bag</h1>
 
-      {cart.length === 0 ? (
+      {closed ? (
+        <div className="mt-16 border border-line bg-stage p-10">
+          <p className="display text-3xl font-semibold uppercase">Ticket closed</p>
+          <p className="mt-3 max-w-md text-sm leading-6 text-fog">
+            Mock desk — no charge fired. The lots are off the rail. Come back after dark.
+          </p>
+          <Link href="/shop" className="mt-6 inline-flex h-11 items-center bg-candy px-5 text-sm text-white">
+            Back to the floor
+          </Link>
+        </div>
+      ) : cart.length === 0 ? (
         <div className="mt-16 border border-line bg-stage p-10">
           <p className="text-fog">Nothing lifted yet.</p>
           <Link href="/shop" className="mt-4 inline-flex h-11 items-center bg-candy px-5 text-sm text-white">
@@ -98,7 +115,7 @@ export default function BagPage() {
             </dl>
             <button
               type="button"
-              onClick={() => clear()}
+              onClick={closeTicket}
               className="mt-6 h-12 w-full bg-candy text-sm text-white hover:bg-candy-dim"
             >
               Close the ticket

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CardTile } from "@/components/card/CardTile";
 import { cards, sets } from "@/lib/data";
@@ -42,13 +42,23 @@ export function ShopFloor() {
   const params = useSearchParams();
   const router = useRouter();
 
-  const q = params.get("q") ?? "";
+  const qParam = params.get("q") ?? "";
+  const [q, setQ] = useState(qParam);
   const setId = params.get("set") ?? "";
   const type = params.get("type") ?? "";
   const rarity = params.get("rarity") ?? "";
   const sort = params.get("sort") || (params.get("board") === "movers" ? "movers" : "mark");
   const ink = params.get("ink") ?? params.get("arrival") ?? "";
   const max = Number(params.get("max") || 0);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      if (q === qParam) return;
+      setParam("q", q);
+    }, 280);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce query only
+  }, [q]);
 
   function setParam(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
@@ -93,8 +103,8 @@ export function ShopFloor() {
       <div className="sticky top-[4.25rem] z-20 -mx-4 mt-0 border-b border-line bg-void/90 px-4 py-3 backdrop-blur md:mx-0 md:px-0">
         <div className="flex flex-wrap gap-2">
           <input
-            defaultValue={q}
-            onChange={(e) => setParam("q", e.target.value)}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
             placeholder="Name, artist, number"
             className="h-10 min-w-[180px] flex-1 border border-line bg-stage px-3 text-sm outline-none focus:border-candy"
           />
