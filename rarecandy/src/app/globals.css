@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+:root {
+  --void: #07070a;
+  --stage: #101014;
+  --panel: #17171c;
+  --bone: #efe6d6;
+  --fog: #9a9388;
+  --line: #2a2a32;
+  --candy: #ff2f6d;
+  --candy-dim: #c4184e;
+  --mint: #7dffb3;
+  --warn: #ff8a7a;
+  --gold: #e6c27a;
+}
+
+@theme inline {
+  --color-void: var(--void);
+  --color-stage: var(--stage);
+  --color-panel: var(--panel);
+  --color-bone: var(--bone);
+  --color-fog: var(--fog);
+  --color-line: var(--line);
+  --color-candy: var(--candy);
+  --color-candy-dim: var(--candy-dim);
+  --color-mint: var(--mint);
+  --color-warn: var(--warn);
+  --color-gold: var(--gold);
+  --font-sans: var(--font-outfit);
+  --font-display: var(--font-syne);
+  --font-mono: var(--font-ibm);
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(900px 420px at 80% -10%, rgba(255, 47, 109, 0.14), transparent 50%),
+    radial-gradient(700px 380px at 0% 20%, rgba(125, 255, 179, 0.05), transparent 45%),
+    var(--void);
+  color: var(--bone);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100%;
+}
+
+::selection {
+  background: #ff2f6d;
+  color: #fff;
+}
+
+.display {
+  font-family: var(--font-display), sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.spot {
+  background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.09), transparent 42%);
+}
+
+.tape {
+  animation: tape 42s linear infinite;
+}
+
+.tape:hover {
+  animation-play-state: paused;
+}
+
+@keyframes tape {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.sheen {
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.16) 46%,
+    transparent 58%
+  );
+  background-size: 220% 100%;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.group:hover .sheen {
+  animation: sheen 1.1s ease;
+}
+
+@keyframes sheen {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}
+
+.fade {
+  animation: fade 0.65s ease both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+input[type="range"] {
+  accent-color: var(--candy);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a3a44;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tape,
+  .sheen,
+  .fade,
+  html {
+    animation: none !important;
+    scroll-behavior: auto;
+  }
+}
